@@ -1,0 +1,435 @@
+from datetime import datetime
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field
+from app.models.models import DownloaderType, TorrentStatus
+
+
+# ============ Auth Schemas ============
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6)
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChangePassword(BaseModel):
+    """Request body for changing password - never send passwords via query params"""
+    old_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
+
+
+# ============ Downloader Schemas ============
+
+class DownloaderBase(BaseModel):
+    name: str
+    type: DownloaderType
+    host: str
+    port: int
+    username: str = ""
+    password: str = ""
+    use_ssl: bool = False
+    download_dir: str = ""
+    enabled: bool = True
+    auto_report: bool = True
+    download_first_last: bool = False
+    auto_delete: bool = True
+    auto_speed_limit: bool = False
+    max_upload_speed: int = 0
+    max_download_speed: int = 0
+    max_active_downloads: int = 0
+    disk_space_warning: int = 10
+    max_connections: int = 0
+
+
+class DownloaderCreate(DownloaderBase):
+    pass
+
+
+class DownloaderUpdate(BaseModel):
+    name: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    use_ssl: Optional[bool] = None
+    download_dir: Optional[str] = None
+    enabled: Optional[bool] = None
+    auto_report: Optional[bool] = None
+    download_first_last: Optional[bool] = None
+    auto_delete: Optional[bool] = None
+    auto_speed_limit: Optional[bool] = None
+    max_upload_speed: Optional[int] = None
+    max_download_speed: Optional[int] = None
+    max_active_downloads: Optional[int] = None
+    disk_space_warning: Optional[int] = None
+    max_connections: Optional[int] = None
+
+
+class DownloaderResponse(DownloaderBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DownloaderStatus(BaseModel):
+    id: int
+    name: str
+    online: bool
+    upload_speed: float = 0
+    download_speed: float = 0
+    free_space: float = 0
+    active_torrents: int = 0
+    total_torrents: int = 0
+
+
+# ============ RSS Schemas ============
+
+class RssFeedBase(BaseModel):
+    name: str
+    url: str
+    enabled: bool = True
+    downloader_id: Optional[int] = None
+    auto_assign: bool = True
+    site_cookie: str = ""
+    site_domain: str = ""
+    fetch_interval: int = 300
+    max_upload_speed: int = 0
+    max_download_speed: int = 0
+    downloader_max_upload: int = 0
+    downloader_max_download: int = 0
+    max_download_tasks: int = 0
+    only_free: bool = False
+    exclude_hr: bool = False
+    min_size: float = 0
+    max_size: float = 0
+    min_seeders: int = 0
+    max_seeders: int = 0
+    include_keywords: str = ""
+    exclude_keywords: str = ""
+    categories: str = ""
+
+
+class RssFeedCreate(RssFeedBase):
+    pass
+
+
+class RssFeedUpdate(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    enabled: Optional[bool] = None
+    downloader_id: Optional[int] = None
+    auto_assign: Optional[bool] = None
+    site_cookie: Optional[str] = None
+    site_domain: Optional[str] = None
+    fetch_interval: Optional[int] = None
+    max_upload_speed: Optional[int] = None
+    max_download_speed: Optional[int] = None
+    downloader_max_upload: Optional[int] = None
+    downloader_max_download: Optional[int] = None
+    max_download_tasks: Optional[int] = None
+    only_free: Optional[bool] = None
+    exclude_hr: Optional[bool] = None
+    min_size: Optional[float] = None
+    max_size: Optional[float] = None
+    min_seeders: Optional[int] = None
+    max_seeders: Optional[int] = None
+    include_keywords: Optional[str] = None
+    exclude_keywords: Optional[str] = None
+    categories: Optional[str] = None
+
+
+class RssFeedResponse(RssFeedBase):
+    id: int
+    first_run_done: bool
+    last_fetch: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RssRecordResponse(BaseModel):
+    id: int
+    feed_id: int
+    title: str
+    link: str
+    torrent_hash: str
+    size: float
+    is_free: bool
+    is_hr: bool
+    seeders: int
+    leechers: int
+    downloaded: bool
+    download_time: Optional[datetime]
+    skip_reason: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Delete Rule Schemas ============
+
+class DeleteCondition(BaseModel):
+    field: str  # progress, seeding_time, uploaded, downloaded, ratio, etc.
+    operator: str  # gt, lt, eq, gte, lte, contains, not_contains
+    value: Any
+    unit: str = ""  # seconds, minutes, hours, days, MB, GB, KB/s, MB/s
+
+
+class DeleteRuleBase(BaseModel):
+    name: str
+    enabled: bool = True
+    priority: int = 0
+    conditions: List[DeleteCondition] = []
+    condition_logic: str = "AND"
+    duration_seconds: int = 0
+    delete_files: bool = True
+    force_report: bool = True
+    max_delete_count: int = 0
+    downloader_ids: List[int] = []
+    tracker_filter: str = ""
+    tag_filter: str = ""
+
+
+class DeleteRuleCreate(DeleteRuleBase):
+    pass
+
+
+class DeleteRuleUpdate(BaseModel):
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+    conditions: Optional[List[DeleteCondition]] = None
+    condition_logic: Optional[str] = None
+    duration_seconds: Optional[int] = None
+    delete_files: Optional[bool] = None
+    force_report: Optional[bool] = None
+    max_delete_count: Optional[int] = None
+    downloader_ids: Optional[List[int]] = None
+    tracker_filter: Optional[str] = None
+    tag_filter: Optional[str] = None
+
+
+class DeleteRuleResponse(DeleteRuleBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DeleteRecordResponse(BaseModel):
+    id: int
+    rule_id: Optional[int]
+    rule_name: str
+    downloader_id: Optional[int]
+    downloader_name: str
+    torrent_hash: str
+    torrent_name: str
+    size: float
+    uploaded: float
+    downloaded: float
+    ratio: float
+    seeding_time: int
+    tracker: str
+    files_deleted: bool
+    reported: bool
+    deleted_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Speed Limit Schemas ============
+
+class SpeedLimitConfigBase(BaseModel):
+    enabled: bool = False
+    target_upload_speed: float = 0
+    target_download_speed: float = 0
+    safety_margin: float = 0.1
+    kp: float = 0.6
+    ki: float = 0.1
+    kd: float = 0.05
+    report_interval: int = 300
+    telegram_enabled: bool = False
+
+
+class SpeedLimitConfigUpdate(SpeedLimitConfigBase):
+    pass
+
+
+class SpeedLimitConfigResponse(SpeedLimitConfigBase):
+    id: int
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SpeedLimitSiteBase(BaseModel):
+    tracker_domain: str
+    enabled: bool = True
+    target_upload_speed: float = 0
+    target_download_speed: float = 0
+    safety_margin: float = 0.1
+
+
+class SpeedLimitSiteCreate(SpeedLimitSiteBase):
+    pass
+
+
+class SpeedLimitSiteUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    target_upload_speed: Optional[float] = None
+    target_download_speed: Optional[float] = None
+    safety_margin: Optional[float] = None
+
+
+class SpeedLimitSiteResponse(SpeedLimitSiteBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SpeedLimitRecordResponse(BaseModel):
+    id: int
+    tracker_domain: str
+    current_speed: float
+    target_speed: float
+    limit_applied: float
+    phase: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============ U2 Magic Schemas ============
+
+class U2MagicConfigBase(BaseModel):
+    enabled: bool = False
+    cookie: str = ""
+    api_token: str = ""
+    backup_dir: str = ""
+    watch_dir: str = ""
+    fetch_interval: int = 60
+    max_seeders: int = 20
+    download_new: bool = True
+    download_old: bool = True
+    min_size: float = 0
+    max_size: float = 0
+    categories: str = ""
+    downloader_id: Optional[int] = None
+
+
+class U2MagicConfigUpdate(U2MagicConfigBase):
+    pass
+
+
+class U2MagicConfigResponse(U2MagicConfigBase):
+    id: int
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class U2MagicRecordResponse(BaseModel):
+    id: int
+    torrent_id: str
+    torrent_name: str
+    torrent_hash: str
+    magic_type: str
+    magic_duration: int
+    seeders: int
+    leechers: int
+    size: float
+    downloaded: bool
+    download_time: Optional[datetime]
+    skip_reason: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Torrent Schemas ============
+
+class TorrentInfo(BaseModel):
+    hash: str
+    name: str
+    size: float
+    progress: float
+    status: str
+    uploaded: float
+    downloaded: float
+    ratio: float
+    upload_speed: float
+    download_speed: float
+    seeders: int
+    leechers: int
+    seeds_connected: int
+    peers_connected: int
+    tracker: str
+    tags: str
+    category: str
+    save_path: str
+    added_time: Optional[datetime]
+    seeding_time: int
+
+
+# ============ Dashboard Schemas ============
+
+class DashboardStats(BaseModel):
+    total_upload_speed: float
+    total_download_speed: float
+    total_uploaded: float
+    total_downloaded: float
+    active_torrents: int
+    seeding_torrents: int
+    downloading_torrents: int
+    total_torrents: int
+    total_size: float
+    free_space: float
+
+
+class TimelineItem(BaseModel):
+    id: int
+    type: str  # rss, delete, magic
+    title: str
+    description: str
+    timestamp: datetime
+
+
+# ============ System Schemas ============
+
+class SystemStatus(BaseModel):
+    initialized: bool
+    version: str = "1.0.0"

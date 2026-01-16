@@ -1,0 +1,36 @@
+# Models package
+from app.models.models import (
+    User,
+    Downloader,
+    DownloaderType,
+    RssFeed,
+    RssRecord,
+    DeleteRule,
+    DeleteRecord,
+    SpeedLimitConfig,
+    SpeedLimitSite,
+    SpeedLimitRecord,
+    U2MagicConfig,
+    U2MagicRecord,
+    TorrentCache,
+    TorrentStatus,
+    SystemSettings,
+)
+
+__all__ = [
+    "User",
+    "Downloader",
+    "DownloaderType",
+    "RssFeed",
+    "RssRecord",
+    "DeleteRule",
+    "DeleteRecord",
+    "SpeedLimitConfig",
+    "SpeedLimitSite",
+    "SpeedLimitRecord",
+    "U2MagicConfig",
+    "U2MagicRecord",
+    "TorrentCache",
+    "TorrentStatus",
+    "SystemSettings",
+]
