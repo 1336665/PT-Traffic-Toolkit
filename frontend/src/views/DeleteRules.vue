@@ -960,3 +960,4 @@ onMounted(() => {
   @apply p-2 rounded-lg transition-colors;
 }
 </style>
+
