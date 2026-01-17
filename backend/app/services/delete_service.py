@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+import importlib
+import importlib.util
+import re
 from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -257,21 +260,22 @@ class DeleteService:
         return False
 
     def _evaluate_js_rule(self, rule: DeleteRule, torrent: TorrentInfo, stats=None) -> bool:
-        try:
-            import quickjs
-        except Exception as e:
-            logger.error(f"JavaScript rule requires quickjs: {e}")
+        engine = None
+        quickjs = None
+        js2py = None
+        if importlib.util.find_spec("quickjs"):
+            quickjs = importlib.import_module("quickjs")
+            engine = "quickjs"
+        elif importlib.util.find_spec("js2py"):
+            js2py = importlib.import_module("js2py")
+            engine = "js2py"
+        else:
+            logger.error("JavaScript rule engine missing: quickjs or js2py required")
             return False
 
-        context = quickjs.Context()
         code = (rule.code or "").strip()
         if not code:
             return False
-
-        if "=>" in code or code.startswith("function"):
-            context.eval(f"var ruleFn = {code};")
-        else:
-            context.eval(f"var ruleFn = function(maindata, torrent) {{ {code} }};")
 
         maindata = {
             "freeSpace": stats.free_space if stats else 0,
@@ -311,7 +315,28 @@ class DeleteService:
             "globalDownloadSpeed": context_values["global_download_speed"],
             "secondFromZero": context_values["second_from_zero"],
         }
-        return bool(context.call("ruleFn", maindata, torrent_context))
+
+        def normalize_js_function(raw_code: str, target_engine: str) -> str:
+            if "=>" in raw_code and target_engine == "js2py":
+                match = re.match(r"^\s*\((.*?)\)\s*=>\s*{(.*)}\s*$", raw_code, re.S)
+                if match:
+                    args, body = match.groups()
+                    return f"function({args}) {{{body}}}"
+            return raw_code
+
+        if "=>" in code or code.startswith("function"):
+            function_code = normalize_js_function(code, engine)
+        else:
+            function_code = f"function(maindata, torrent) {{ {code} }}"
+
+        if engine == "quickjs":
+            context = quickjs.Context()
+            context.eval(f"var ruleFn = {function_code};")
+            return bool(context.call("ruleFn", maindata, torrent_context))
+
+        context = js2py.EvalJs({})
+        context.execute(f"var ruleFn = {function_code};")
+        return bool(context.ruleFn(maindata, torrent_context))
 
     def check_tracker_filter(self, rule: DeleteRule, torrent: TorrentInfo) -> bool:
         """Check if torrent matches tracker filter"""
