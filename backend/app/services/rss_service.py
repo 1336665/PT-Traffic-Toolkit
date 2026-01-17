@@ -129,12 +129,17 @@ class RssService:
                 response = await client.get(feed.url)
                 response.raise_for_status()
 
-                content = response.text
+                content = response.content
                 logger.info(f"RSS response received: {len(content)} bytes, status: {response.status_code}")
 
                 # Log first 500 chars for debugging
                 if len(content) > 0:
-                    logger.debug(f"RSS content preview: {content[:500]}...")
+                    try:
+                        preview = content[:500].decode(errors="ignore")
+                    except Exception:
+                        preview = ""
+                    if preview:
+                        logger.debug(f"RSS content preview: {preview}...")
 
                 parsed = feedparser.parse(content)
 
