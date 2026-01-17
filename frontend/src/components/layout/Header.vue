@@ -32,14 +32,63 @@
       </button>
 
       <!-- 通知按钮 -->
-      <button
-        class="relative p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-        @click="openNotifications"
-      >
-        <BellIcon class="h-5 w-5" />
-        <!-- 通知红点 -->
-        <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-      </button>
+      <div class="relative">
+        <button
+          class="relative p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          @click="toggleNotifications"
+        >
+          <BellIcon class="h-5 w-5" />
+          <!-- 通知红点 -->
+          <span
+            v-if="errorCount > 0"
+            class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"
+          ></span>
+        </button>
+        <transition
+          enter-active-class="transition ease-out duration-200"
+          enter-from-class="transform opacity-0 scale-95 -translate-y-2"
+          enter-to-class="transform opacity-100 scale-100 translate-y-0"
+          leave-active-class="transition ease-in duration-150"
+          leave-from-class="transform opacity-100 scale-100 translate-y-0"
+          leave-to-class="transform opacity-0 scale-95 -translate-y-2"
+        >
+          <div
+            v-if="notificationOpen"
+            class="absolute right-0 mt-2 w-80 rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-50"
+          >
+            <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">错误通知</span>
+                <button
+                  class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  @click="toggleNotifications"
+                >
+                  关闭
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                最近 24 小时错误：{{ errorCount }}
+              </p>
+            </div>
+            <div class="max-h-72 overflow-y-auto">
+              <div v-if="loadingErrors" class="p-4 text-sm text-gray-500">加载中...</div>
+              <div v-else-if="errorLogs.length === 0" class="p-4 text-sm text-gray-500">
+                暂无错误信息
+              </div>
+              <ul v-else class="divide-y divide-gray-100 dark:divide-gray-700">
+                <li v-for="log in errorLogs" :key="log.id" class="px-4 py-3">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {{ log.message }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {{ formatLogTime(log.timestamp) }} · {{ log.module }}
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </transition>
+      </div>
 
       <!-- Dark mode toggle -->
       <button
@@ -220,7 +269,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import {
@@ -251,6 +300,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
+import { logsApi } from '@/api'
 
 const $t = inject('t')
 const route = useRoute()
@@ -259,6 +309,11 @@ const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 
 const mobileMenuOpen = ref(false)
+const notificationOpen = ref(false)
+const errorLogs = ref([])
+const loadingErrors = ref(false)
+const errorCount = ref(0)
+let errorIntervalId
 
 const navItems = [
   { name: '仪表盘', path: '/', icon: HomeIcon },
@@ -280,7 +335,50 @@ function logout() {
   router.push('/login')
 }
 
-function openNotifications() {
-  router.push('/logs')
+function formatLogTime(timestamp) {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+async function loadErrorStats() {
+  try {
+    const response = await logsApi.getStats(24)
+    errorCount.value = response.data?.by_level?.ERROR || 0
+  } catch (error) {
+    console.error('Failed to load error stats:', error)
+  }
+}
+
+async function loadErrorLogs() {
+  loadingErrors.value = true
+  try {
+    const response = await logsApi.getLogs({ level: 'ERROR', limit: 10 })
+    errorLogs.value = response.data || []
+  } catch (error) {
+    console.error('Failed to load error logs:', error)
+  } finally {
+    loadingErrors.value = false
+  }
+}
+
+async function toggleNotifications() {
+  notificationOpen.value = !notificationOpen.value
+  if (notificationOpen.value) {
+    await loadErrorLogs()
+    await loadErrorStats()
+  }
+}
+
+onMounted(() => {
+  loadErrorStats()
+  errorIntervalId = setInterval(loadErrorStats, 60000)
+})
+
+onUnmounted(() => {
+  if (errorIntervalId) {
+    clearInterval(errorIntervalId)
+  }
+})
 </script>
