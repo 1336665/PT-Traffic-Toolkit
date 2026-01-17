@@ -9,7 +9,7 @@ from sqlalchemy import select, delete
 from app.database import async_session_maker
 from app.models import (
     RssFeed, Downloader, SpeedLimitConfig, U2MagicConfig, DeleteRule,
-    SpeedLimitRecord, DeleteRecord, RssRecord, U2MagicRecord
+    SpeedLimitRecord, DeleteRecord, RssRecord, U2MagicRecord, SystemSettings
 )
 from app.services.rss_service import RssService
 from app.services.delete_service import DeleteService
@@ -68,10 +68,11 @@ class TaskScheduler:
         )
 
         # Delete rule checking
+        delete_interval = await self._get_delete_interval()
         self.add_job(
             "delete_check",
             self._run_delete_check,
-            IntervalTrigger(seconds=DELETE_CHECK_INTERVAL_SECONDS),
+            IntervalTrigger(seconds=delete_interval),
         )
 
         # Speed limit control
@@ -104,6 +105,19 @@ class TaskScheduler:
 
         logger.info("Default jobs configured")
 
+    async def _get_delete_interval(self) -> int:
+        try:
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(SystemSettings).where(SystemSettings.key == "delete_check_interval_seconds")
+                )
+                setting = result.scalar_one_or_none()
+                if setting and setting.value:
+                    return max(5, int(setting.value))
+        except Exception as e:
+            logger.error(f"Failed to load delete interval: {e}")
+        return DELETE_CHECK_INTERVAL_SECONDS
+
     def add_job(self, name: str, func, trigger, **kwargs):
         """Add or replace a job"""
         if name in self._jobs:
@@ -117,6 +131,14 @@ class TaskScheduler:
         if name in self._jobs:
             self.scheduler.remove_job(self._jobs[name])
             del self._jobs[name]
+
+    def set_delete_interval(self, seconds: int):
+        """Update delete rule check interval in seconds."""
+        self.add_job(
+            "delete_check",
+            self._run_delete_check,
+            IntervalTrigger(seconds=seconds),
+        )
 
     async def _run_rss_check(self):
         """Run RSS feed checking"""

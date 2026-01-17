@@ -1,10 +1,11 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import User, DeleteRule, DeleteRecord
+from app.models import User, DeleteRule, DeleteRecord, SystemSettings
 from app.schemas import (
     DeleteRuleCreate,
     DeleteRuleUpdate,
@@ -13,8 +14,16 @@ from app.schemas import (
 )
 from app.services.auth import get_current_user
 from app.services.delete_service import DeleteService
+from app.tasks import get_scheduler
+from app.tasks.scheduler import DELETE_CHECK_INTERVAL_SECONDS
 
 router = APIRouter(prefix="/delete-rules", tags=["Delete Rules"])
+
+DELETE_INTERVAL_KEY = "delete_check_interval_seconds"
+
+
+class DeleteIntervalUpdate(BaseModel):
+    seconds: int = Field(..., ge=5, le=3600)
 
 
 @router.get("", response_model=List[DeleteRuleResponse])
@@ -201,3 +210,34 @@ async def get_delete_records(
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.get("/interval")
+async def get_delete_interval(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get delete rule scheduler interval in seconds."""
+    result = await db.execute(select(SystemSettings).where(SystemSettings.key == DELETE_INTERVAL_KEY))
+    setting = result.scalar_one_or_none()
+    seconds = int(setting.value) if setting and setting.value else DELETE_CHECK_INTERVAL_SECONDS
+    return {"seconds": seconds}
+
+
+@router.put("/interval")
+async def update_delete_interval(
+    data: DeleteIntervalUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update delete rule scheduler interval in seconds."""
+    result = await db.execute(select(SystemSettings).where(SystemSettings.key == DELETE_INTERVAL_KEY))
+    setting = result.scalar_one_or_none()
+    if not setting:
+        setting = SystemSettings(key=DELETE_INTERVAL_KEY, value=str(data.seconds))
+        db.add(setting)
+    else:
+        setting.value = str(data.seconds)
+    await db.commit()
+    get_scheduler().set_delete_interval(data.seconds)
+    return {"seconds": data.seconds}
