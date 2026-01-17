@@ -221,6 +221,61 @@ class U2MagicService:
             logger.debug(f"解析流量优惠失败: {e}")
         return pro
 
+    def _extract_size_bytes(self, soup: BeautifulSoup) -> int:
+        """解析种子体积（字节）"""
+        time_tag = soup.time
+        if not time_tag or not time_tag.parent:
+            return 0
+
+        contents = time_tag.parent.contents
+        if len(contents) <= 5:
+            return 0
+
+        size_str = contents[5].strip() if hasattr(contents[5], 'strip') else ''
+        size_str = size_str.replace(',', '.').replace('Б', 'B')
+        size_bytes = parse_size(size_str)
+
+        if size_bytes == 0:
+            parts = size_str.split()
+            if len(parts) >= 2:
+                try:
+                    num = float(parts[0])
+                    unit = parts[1]
+                except ValueError:
+                    return 0
+                unit_map = {
+                    'MIB': 1024 ** 2,
+                    'GIB': 1024 ** 3,
+                    'TIB': 1024 ** 4,
+                    '喵': 1024 ** 2,
+                    '寄': 1024 ** 3,
+                    '烫': 1024 ** 4,
+                    'EGAMAY': 1024 ** 2,
+                    'IGAGAY': 1024 ** 3,
+                    'ERATAY': 1024 ** 4,
+                }
+                size_bytes = int(num * unit_map.get(unit.upper(), 0))
+
+        return int(size_bytes)
+
+    def _format_magic_type(self, promo_info: Dict[str, float]) -> str:
+        """根据优惠倍率生成魔法类型文本"""
+        ur = promo_info.get('ur', 1.0)
+        dr = promo_info.get('dr', 1.0)
+
+        if dr == 0:
+            if ur > 1:
+                return f"{int(ur)}xFree" if float(ur).is_integer() else f"{ur}xFree"
+            return "Free"
+
+        if ur > 1:
+            return f"{int(ur)}x" if float(ur).is_integer() else f"{ur}x"
+
+        if dr < 1:
+            return f"{int(dr * 100)}%"
+
+        return "Normal"
+
     async def fetch_magic_from_api(
         self,
         config: U2MagicConfig
@@ -429,43 +484,15 @@ class U2MagicService:
                         return None
 
         # 体积过滤
-        if config.min_size > 0 or config.max_size > 0:
-            time_tag = soup.time
-            if time_tag and time_tag.parent:
-                contents = time_tag.parent.contents
-                if len(contents) > 5:
-                    size_str = contents[5].strip() if hasattr(contents[5], 'strip') else ''
-                    size_str = size_str.replace(',', '.').replace('Б', 'B')
-                    size_bytes = parse_size(size_str)
-                    if size_bytes == 0:
-                        parts = size_str.split()
-                        if len(parts) >= 2:
-                            try:
-                                num = float(parts[0])
-                                unit = parts[1]
-                            except ValueError:
-                                num = 0
-                                unit = ""
-                            unit_map = {
-                                'MIB': 1024 ** 2,
-                                'GIB': 1024 ** 3,
-                                'TIB': 1024 ** 4,
-                                '喵': 1024 ** 2,
-                                '寄': 1024 ** 3,
-                                '烫': 1024 ** 4,
-                                'EGAMAY': 1024 ** 2,
-                                'IGAGAY': 1024 ** 3,
-                                'ERATAY': 1024 ** 4,
-                            }
-                            size_bytes = int(num * unit_map.get(unit.upper(), 0))
-                    if size_bytes > 0:
-                        gb = size_bytes / (1024 ** 3)
-                        if config.min_size > 0 and gb < config.min_size:
-                            logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 小于最小值")
-                            return None
-                        if config.max_size > 0 and gb > config.max_size:
-                            logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 大于最大值")
-                            return None
+        size_bytes = self._extract_size_bytes(soup)
+        if size_bytes > 0 and (config.min_size > 0 or config.max_size > 0):
+            gb = size_bytes / (1024 ** 3)
+            if config.min_size > 0 and gb < config.min_size:
+                logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 小于最小值")
+                return None
+            if config.max_size > 0 and gb > config.max_size:
+                logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 大于最大值")
+                return None
 
         # 获取时区
         tz = self._get_timezone(soup)
@@ -496,6 +523,7 @@ class U2MagicService:
                 break
 
         is_free = promo_info['dr'] == 0
+        magic_type = self._format_magic_type(promo_info)
 
         # 新种逻辑
         if is_new:
@@ -519,6 +547,8 @@ class U2MagicService:
                 'seeders': seeders,
                 'is_new': True,
                 'is_free': is_free,
+                'magic_type': magic_type,
+                'size': size_bytes,
             }
 
         # 旧种逻辑
@@ -595,6 +625,8 @@ class U2MagicService:
                                 'is_new': False,
                                 'is_free': is_free,
                                 'is_bridge': True,
+                                'magic_type': magic_type,
+                                'size': size_bytes,
                             }
 
             logger.debug(f"种子 {tid} 做种人数 {seeders} > {config.max_seeders}")
@@ -608,6 +640,8 @@ class U2MagicService:
             'seeders': seeders,
             'is_new': False,
             'is_free': is_free,
+            'magic_type': magic_type,
+            'size': size_bytes,
         }
 
     async def download_torrent(
@@ -772,8 +806,9 @@ class U2MagicService:
                             record = U2MagicRecord(
                                 torrent_id=str(tid),
                                 torrent_name=info['name'],
-                                magic_type='free' if info.get('is_free') else 'other',
+                                magic_type=info.get('magic_type', ''),
                                 seeders=info.get('seeders', 0),
+                                size=info.get('size', 0),
                                 downloaded=True,
                                 download_time=datetime.utcnow(),
                             )
@@ -782,7 +817,9 @@ class U2MagicService:
                             record = U2MagicRecord(
                                 torrent_id=str(tid),
                                 torrent_name=info['name'],
+                                magic_type=info.get('magic_type', ''),
                                 seeders=info.get('seeders', 0),
+                                size=info.get('size', 0),
                                 downloaded=False,
                                 skip_reason="添加到下载器失败",
                             )
@@ -791,7 +828,9 @@ class U2MagicService:
                         record = U2MagicRecord(
                             torrent_id=str(tid),
                             torrent_name=info['name'],
+                            magic_type=info.get('magic_type', ''),
                             seeders=info.get('seeders', 0),
+                            size=info.get('size', 0),
                             downloaded=False,
                             skip_reason="下载种子文件失败",
                         )

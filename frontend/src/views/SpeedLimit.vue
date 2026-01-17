@@ -132,8 +132,8 @@
             :key="tracker"
             class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
           >
-            <div class="flex items-center justify-between mb-3">
-              <span class="font-medium text-gray-900 dark:text-white truncate">{{ tracker }}</span>
+            <div class="flex items-center justify-between gap-2 mb-3 min-w-0">
+              <span class="font-medium text-gray-900 dark:text-white truncate min-w-0">{{ tracker }}</span>
               <span :class="getPhaseClass(data.phase)" class="text-xs px-2 py-1 rounded-full">
                 {{ getPhaseLabel(data.phase) }}
               </span>
@@ -158,11 +158,11 @@
             </div>
             <!-- Speed Info -->
             <div class="space-y-2">
-              <div class="flex items-center justify-between text-sm">
+              <div class="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ $t('speedLimit.currentSpeed') }}</span>
                 <span class="font-medium text-blue-600 dark:text-blue-400">{{ formatSpeed(data.filtered_speed || 0) }}</span>
               </div>
-              <div class="flex items-center justify-between text-sm">
+              <div class="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ $t('speedLimit.limit') }}</span>
                 <span class="font-medium text-amber-600 dark:text-amber-400">{{ formatSpeed(data.last_limit || 0) }}</span>
               </div>
@@ -187,13 +187,13 @@
           <!-- Speed Settings -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
-              <label class="form-label">目标上传速度 (B/s)</label>
-              <input v-model.number="config.target_upload_speed" type="number" min="0" class="form-input" />
+              <label class="form-label">目标上传速度 (KB/s)</label>
+              <input v-model.number="displayTargetUploadSpeed" type="number" min="0" step="0.1" class="form-input" />
               <p class="text-xs text-gray-500 mt-1">{{ formatSpeed(config.target_upload_speed) }}</p>
             </div>
             <div>
-              <label class="form-label">目标下载速度 (B/s)</label>
-              <input v-model.number="config.target_download_speed" type="number" min="0" class="form-input" />
+              <label class="form-label">目标下载速度 (KB/s)</label>
+              <input v-model.number="displayTargetDownloadSpeed" type="number" min="0" step="0.1" class="form-input" />
               <p class="text-xs text-gray-500 mt-1">{{ formatSpeed(config.target_download_speed) }}</p>
             </div>
             <div>
@@ -334,13 +334,13 @@
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="form-label">{{ $t('speedLimit.targetUploadSpeed') }} (B/s)</label>
-            <input v-model.number="siteForm.target_upload_speed" type="number" min="0" class="form-input" />
+            <label class="form-label">{{ $t('speedLimit.targetUploadSpeed') }} (KB/s)</label>
+            <input v-model.number="displaySiteUploadSpeed" type="number" min="0" step="0.1" class="form-input" />
             <p class="text-xs text-gray-500 mt-1">{{ formatSpeed(siteForm.target_upload_speed) }}</p>
           </div>
           <div>
-            <label class="form-label">{{ $t('speedLimit.targetDownloadSpeed') }} (B/s)</label>
-            <input v-model.number="siteForm.target_download_speed" type="number" min="0" class="form-input" />
+            <label class="form-label">{{ $t('speedLimit.targetDownloadSpeed') }} (KB/s)</label>
+            <input v-model.number="displaySiteDownloadSpeed" type="number" min="0" step="0.1" class="form-input" />
             <p class="text-xs text-gray-500 mt-1">{{ formatSpeed(siteForm.target_download_speed) }}</p>
           </div>
         </div>
@@ -434,6 +434,35 @@ const defaultSiteForm = {
 }
 
 const siteForm = reactive({ ...defaultSiteForm })
+const KB = 1024
+
+const displayTargetUploadSpeed = computed({
+  get: () => (config.target_upload_speed || 0) / KB,
+  set: (value) => {
+    config.target_upload_speed = Math.max(0, Math.round((Number(value) || 0) * KB))
+  },
+})
+
+const displayTargetDownloadSpeed = computed({
+  get: () => (config.target_download_speed || 0) / KB,
+  set: (value) => {
+    config.target_download_speed = Math.max(0, Math.round((Number(value) || 0) * KB))
+  },
+})
+
+const displaySiteUploadSpeed = computed({
+  get: () => (siteForm.target_upload_speed || 0) / KB,
+  set: (value) => {
+    siteForm.target_upload_speed = Math.max(0, Math.round((Number(value) || 0) * KB))
+  },
+})
+
+const displaySiteDownloadSpeed = computed({
+  get: () => (siteForm.target_download_speed || 0) / KB,
+  set: (value) => {
+    siteForm.target_download_speed = Math.max(0, Math.round((Number(value) || 0) * KB))
+  },
+})
 
 // Computed current speeds from status
 const currentUploadSpeed = computed(() => {
@@ -527,11 +556,16 @@ const chartOption = computed(() => ({
 }))
 
 function formatSpeed(bytes) {
-  if (!bytes) return '0 B/s'
+  if (!bytes) return '0 KB/s'
   const k = 1024
-  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  const sizes = ['KB/s', 'MB/s', 'GB/s', 'TB/s']
+  let value = bytes / k
+  let i = 0
+  while (value >= k && i < sizes.length - 1) {
+    value /= k
+    i += 1
+  }
+  return parseFloat(value.toFixed(2)) + ' ' + sizes[i]
 }
 
 function getPhaseIndex(phase) {

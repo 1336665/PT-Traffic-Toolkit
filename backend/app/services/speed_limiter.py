@@ -40,6 +40,7 @@ class C:
     PHASE_FINISH = "finish"
 
     # 阶段时间阈值（秒）
+    WARMUP_TIME = 30
     FINISH_TIME = 30
     STEADY_TIME = 120
 
@@ -721,8 +722,12 @@ class SpeedLimiterService:
             tracked_speed = filtered_speed
 
         # 获取剩余时间和阶段
-        time_left = state.get_time_left(now)
-        phase = get_phase(time_left, state.cycle_synced)
+        if state.cycle_synced:
+            time_left = state.get_time_left(now)
+            phase = get_phase(time_left, True)
+        else:
+            time_left = state.get_time_left(now)
+            phase = C.PHASE_WARMUP if (now - state.time_added) <= C.WARMUP_TIME else C.PHASE_CATCH
         state.phase = phase
 
         # 更新PID参数
@@ -921,6 +926,7 @@ class SpeedLimiterService:
                 "tracker": state.tracker,
                 "phase": state.phase,
                 "limit": state.current_limit,
+                "last_limit": state.current_limit,
                 "time_left": state.get_time_left(now),
                 "cycle_synced": state.cycle_synced,
                 "cycle_interval": state.cycle_interval,
