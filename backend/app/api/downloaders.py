@@ -165,6 +165,10 @@ async def get_downloader_status(
                 free_space=stats.free_space,
                 active_torrents=stats.active_torrents,
                 total_torrents=stats.total_torrents,
+                seeding_torrents=stats.seeding_torrents,
+                downloading_torrents=stats.downloading_torrents,
+                total_uploaded=stats.total_uploaded,
+                total_downloaded=stats.total_downloaded,
             )
     except Exception:
         pass
@@ -217,6 +221,12 @@ async def get_downloader_torrents(
                     save_path=t.save_path,
                     added_time=t.added_time,
                     seeding_time=t.seeding_time,
+                    total_size=t.total_size,
+                    selected_size=t.selected_size,
+                    completed=t.completed,
+                    completed_time=t.completed_time,
+                    state=t.state,
+                    tracker_status=t.tracker_status,
                 )
                 for t in torrents
             ]

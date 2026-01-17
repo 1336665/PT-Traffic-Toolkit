@@ -101,6 +101,8 @@ export const deleteRulesApi = {
   run: (id) => api.post(`/delete-rules/${id}/run`),
   preview: (id) => api.post(`/delete-rules/${id}/preview`),
   getRecords: (params) => api.get('/delete-rules/records/all', { params }),
+  getInterval: () => api.get('/delete-rules/interval'),
+  updateInterval: (seconds) => api.put('/delete-rules/interval', { seconds }),
 }
 
 // Speed Limit API

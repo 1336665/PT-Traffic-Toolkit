@@ -128,12 +128,19 @@
         </div>
         <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="(data, tracker) in status"
-            :key="tracker"
+            v-for="(data, hash) in status"
+            :key="hash"
             class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
           >
-            <div class="flex items-center justify-between gap-2 mb-3 min-w-0">
-              <span class="font-medium text-gray-900 dark:text-white truncate min-w-0">{{ tracker }}</span>
+            <div class="flex items-start justify-between gap-2 mb-3 min-w-0">
+              <div class="min-w-0">
+                <div class="font-medium text-gray-900 dark:text-white truncate min-w-0">
+                  {{ data.name || hash }}
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {{ data.tracker || '' }}
+                </div>
+              </div>
               <span :class="getPhaseClass(data.phase)" class="text-xs px-2 py-1 rounded-full">
                 {{ getPhaseLabel(data.phase) }}
               </span>

@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6 ">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
           <TrashIcon class="w-6 h-6 text-white" />
@@ -11,10 +11,19 @@
           <p class="text-sm text-gray-500 dark:text-gray-400">智能管理种子，自动清理释放空间</p>
         </div>
       </div>
-      <Button variant="primary" @click="openRuleModal()">
-        <PlusIcon class="w-4 h-4" />
-        添加规则
-      </Button>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-800">
+          <span class="text-sm text-gray-600 dark:text-gray-300">运行间隔(秒)</span>
+          <input v-model.number="deleteIntervalSeconds" type="number" min="5" class="form-input w-24 text-sm" />
+          <Button variant="secondary" size="sm" :loading="savingInterval" @click="saveDeleteInterval">
+            保存
+          </Button>
+        </div>
+        <Button variant="primary" @click="openRuleModal()">
+          <PlusIcon class="w-4 h-4" />
+          添加规则
+        </Button>
+      </div>
     </div>
 
     <!-- Stats Row -->
@@ -119,36 +128,57 @@
           </div>
           <div class="space-y-2">
             <div
-              v-for="(cond, idx) in rule.conditions"
-              :key="idx"
-              class="flex items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+              v-if="rule.rule_type === 'javascript'"
+              class="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-sm text-gray-600 dark:text-gray-300"
             >
-              <span class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs font-bold mr-3">
-                {{ idx + 1 }}
-              </span>
-              <div class="flex-1 flex items-center flex-wrap gap-2">
-                <span class="badge badge-info">{{ getFieldLabel(cond.field) }}</span>
-                <span class="text-lg font-bold text-gray-400">{{ getOperatorSymbol(cond.operator) }}</span>
-                <span class="badge bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  {{ cond.value }}{{ cond.unit ? ' ' + cond.unit : '' }}
+              JavaScript 规则
+              <pre class="mt-2 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap">{{ rule.code || '未填写代码' }}</pre>
+            </div>
+            <template v-else>
+              <div
+                v-for="(cond, idx) in rule.conditions"
+                :key="idx"
+                class="flex items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+              >
+                <span class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs font-bold mr-3">
+                  {{ idx + 1 }}
                 </span>
+                <div class="flex-1 flex items-center flex-wrap gap-2">
+                  <span class="badge badge-info">{{ getFieldLabel(cond.field) }}</span>
+                  <span class="text-lg font-bold text-gray-400">{{ getOperatorSymbol(cond.operator) }}</span>
+                  <span class="badge bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                    {{ cond.value }}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div v-if="rule.conditions.length === 0" class="text-center py-4 text-gray-400 text-sm">
-              暂无条件
-            </div>
+              <div v-if="rule.conditions.length === 0" class="text-center py-4 text-gray-400 text-sm">
+                暂无条件
+              </div>
+            </template>
           </div>
         </div>
 
         <!-- Options Row -->
         <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700/50">
           <div class="flex flex-wrap gap-2">
+            <span class="badge badge-gray">
+              {{ rule.rule_type === 'javascript' ? 'JavaScript' : '普通' }}
+            </span>
             <span v-if="rule.duration_seconds" class="badge badge-info">
               <ClockIcon class="w-3 h-3 mr-1" />
               持续 {{ formatDuration(rule.duration_seconds) }}
             </span>
             <span :class="rule.delete_files ? 'badge badge-danger' : 'badge badge-success'">
               {{ rule.delete_files ? '删除文件' : '仅移除' }}
+            </span>
+            <span v-if="rule.only_delete_torrent" class="badge badge-gray">
+              仅删除种子
+            </span>
+            <span v-if="rule.pause" class="badge badge-warning">
+              暂停种子
+            </span>
+            <span v-if="rule.limit_speed" class="badge badge-purple">
+              限速 {{ formatSpeed(rule.limit_speed) }}
             </span>
             <span v-if="rule.force_report" class="badge badge-purple">
               删前汇报
@@ -256,7 +286,7 @@
     <Modal v-model="ruleModalOpen" :title="editingRule ? '编辑规则' : '添加规则'" size="2xl">
       <form @submit.prevent="saveRule" class="space-y-6">
         <!-- Basic Info -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="md:col-span-2 form-group">
             <label class="form-label">规则名称</label>
             <input v-model="ruleForm.name" type="text" required class="form-input" placeholder="例如：低分享率自动清理" />
@@ -265,10 +295,17 @@
             <label class="form-label">优先级</label>
             <input v-model.number="ruleForm.priority" type="number" class="form-input" placeholder="数字越大优先级越高" />
           </div>
+          <div class="form-group">
+            <label class="form-label">类型</label>
+            <select v-model="ruleForm.rule_type" class="form-select">
+              <option value="normal">普通</option>
+              <option value="javascript">JavaScript</option>
+            </select>
+          </div>
         </div>
 
         <!-- Conditions Builder - Enhanced Vertex Style -->
-        <div class="card overflow-hidden">
+        <div v-if="ruleForm.rule_type === 'normal'" class="card overflow-hidden">
           <div class="px-5 py-4 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-3">
@@ -323,35 +360,52 @@
                   {{ idx + 1 }}
                 </span>
 
-                <div class="flex-1 grid grid-cols-4 gap-3">
+                <div class="flex-1 grid grid-cols-3 gap-3">
                   <!-- Field Select -->
                   <div>
                     <select v-model="cond.field" class="form-select text-sm">
-                      <optgroup label="进度相关">
+                      <optgroup label="基础信息">
+                        <option value="name">种子名称</option>
                         <option value="progress">种子进度</option>
-                        <option value="ratio">分享率</option>
-                      </optgroup>
-                      <optgroup label="时间相关">
-                        <option value="seeding_time">做种时间</option>
-                        <option value="added_time">添加时间</option>
+                        <option value="state">种子状态</option>
+                        <option value="category">种子分类</option>
+                        <option value="tags">种子标签</option>
+                        <option value="tracker">站点域名</option>
+                        <option value="trackerStatus">返回信息</option>
+                        <option value="savePath">保存路径</option>
                       </optgroup>
                       <optgroup label="数据量">
-                        <option value="uploaded">上传量</option>
-                        <option value="downloaded">下载量</option>
-                        <option value="size">种子大小</option>
+                        <option value="size">选择大小</option>
+                        <option value="totalSize">种子大小</option>
+                        <option value="completed">已完成量</option>
+                        <option value="downloaded">已下载量</option>
+                        <option value="uploaded">已上传量</option>
+                      </optgroup>
+                      <optgroup label="分享率">
+                        <option value="ratio">分享率一</option>
+                        <option value="trueRatio">分享率二</option>
+                        <option value="ratio3">分享率三</option>
+                      </optgroup>
+                      <optgroup label="时间">
+                        <option value="addedTime">添加时间</option>
+                        <option value="completedTime">完成时间</option>
+                        <option value="seeding_time">做种时间</option>
                       </optgroup>
                       <optgroup label="速度">
-                        <option value="upload_speed">上传速度</option>
-                        <option value="download_speed">下载速度</option>
+                        <option value="uploadSpeed">上传速度</option>
+                        <option value="downloadSpeed">下载速度</option>
+                        <option value="globalUploadSpeed">全局上传</option>
+                        <option value="globalDownloadSpeed">全局下载</option>
                       </optgroup>
-                      <optgroup label="连接">
-                        <option value="seeders">做种人数</option>
-                        <option value="leechers">下载人数</option>
+                      <optgroup label="连接/任务">
+                        <option value="seeder">做种连接</option>
+                        <option value="leecher">下载连接</option>
+                        <option value="leechingCount">下载任务</option>
+                        <option value="seedingCount">做种任务</option>
                       </optgroup>
-                      <optgroup label="其他">
-                        <option value="tracker">Tracker</option>
-                        <option value="tags">标签</option>
-                        <option value="status">状态</option>
+                      <optgroup label="系统">
+                        <option value="freeSpace">剩余空间</option>
+                        <option value="secondFromZero">当前时间</option>
                       </optgroup>
                     </select>
                   </div>
@@ -359,13 +413,15 @@
                   <!-- Operator Select -->
                   <div>
                     <select v-model="cond.operator" class="form-select text-sm">
-                      <option value="gt">大于 (&gt;)</option>
-                      <option value="gte">大于等于 (&ge;)</option>
-                      <option value="lt">小于 (&lt;)</option>
-                      <option value="lte">小于等于 (&le;)</option>
-                      <option value="eq">等于 (=)</option>
-                      <option value="contains">包含</option>
-                      <option value="not_contains">不包含</option>
+                      <option value="equals">等于</option>
+                      <option value="bigger">大于</option>
+                      <option value="smaller">小于</option>
+                      <option value="contain">包含</option>
+                      <option value="includeIn">包含于</option>
+                      <option value="notContain">不包含</option>
+                      <option value="notIncludeIn">不包含于</option>
+                      <option value="regExp">正则匹配</option>
+                      <option value="notRegExp">正则不匹配</option>
                     </select>
                   </div>
 
@@ -377,32 +433,6 @@
                       class="form-input text-sm"
                       placeholder="输入值"
                     />
-                  </div>
-
-                  <!-- Unit Select -->
-                  <div>
-                    <select v-model="cond.unit" class="form-select text-sm">
-                      <option value="">无单位</option>
-                      <template v-if="isTimeField(cond.field)">
-                        <option value="seconds">秒</option>
-                        <option value="minutes">分钟</option>
-                        <option value="hours">小时</option>
-                        <option value="days">天</option>
-                      </template>
-                      <template v-else-if="isSizeField(cond.field)">
-                        <option value="KB">KB</option>
-                        <option value="MB">MB</option>
-                        <option value="GB">GB</option>
-                        <option value="TB">TB</option>
-                      </template>
-                      <template v-else-if="isSpeedField(cond.field)">
-                        <option value="KB/s">KB/s</option>
-                        <option value="MB/s">MB/s</option>
-                      </template>
-                      <template v-else-if="cond.field === 'progress'">
-                        <option value="%">%</option>
-                      </template>
-                    </select>
                   </div>
                 </div>
 
@@ -427,6 +457,28 @@
           </div>
         </div>
 
+        <div v-else class="card overflow-hidden">
+          <div class="px-5 py-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                <DocumentDuplicateIcon class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h4 class="font-semibold text-gray-900 dark:text-white">JavaScript 规则</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400">返回 true 触发动作</p>
+              </div>
+            </div>
+          </div>
+          <div class="p-5">
+            <textarea
+              v-model="ruleForm.code"
+              rows="8"
+              class="form-input font-mono text-sm"
+              placeholder="(maindata, torrent) => { return false; }"
+            ></textarea>
+          </div>
+        </div>
+
         <!-- Advanced Options -->
         <div class="card">
           <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -444,6 +496,12 @@
                 <label class="form-label">单次最大删除数</label>
                 <input v-model.number="ruleForm.max_delete_count" type="number" min="0" class="form-input" />
                 <p class="form-hint">0 表示不限制</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">限速（Byte/s）</label>
+                <input v-model.number="ruleForm.limit_speed" type="number" min="0" class="form-input" />
+                <p class="form-hint">填写后将改为限制下载速度</p>
               </div>
 
               <div class="form-group">
@@ -476,6 +534,24 @@
                   <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
                 </div>
                 <span class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">删除本地文件</span>
+              </label>
+
+              <label class="flex items-center space-x-3 cursor-pointer group">
+                <div class="relative">
+                  <input v-model="ruleForm.only_delete_torrent" type="checkbox" class="sr-only peer" />
+                  <div class="w-10 h-5 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-gray-500 peer-focus:ring-2 peer-focus:ring-gray-300 transition-colors"></div>
+                  <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">仅删除种子</span>
+              </label>
+
+              <label class="flex items-center space-x-3 cursor-pointer group">
+                <div class="relative">
+                  <input v-model="ruleForm.pause" type="checkbox" class="sr-only peer" />
+                  <div class="w-10 h-5 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-yellow-500 peer-focus:ring-2 peer-focus:ring-yellow-300 transition-colors"></div>
+                  <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                </div>
+                <span class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">暂停种子</span>
               </label>
 
               <label class="flex items-center space-x-3 cursor-pointer group">
@@ -559,6 +635,8 @@ const editingRule = ref(null)
 const savingRule = ref(false)
 const runningRule = ref(null)
 const previewingRule = ref(null)
+const deleteIntervalSeconds = ref(60)
+const savingInterval = ref(false)
 
 const previewModalOpen = ref(false)
 const previewResults = ref([])
@@ -583,6 +661,11 @@ const defaultRuleForm = {
   delete_files: true,
   force_report: true,
   max_delete_count: 0,
+  pause: false,
+  only_delete_torrent: false,
+  limit_speed: 0,
+  rule_type: 'normal',
+  code: '(maindata, torrent) => {\n  return false;\n}',
   downloader_ids: [],
   tracker_filter: '',
   tag_filter: '',
@@ -591,40 +674,60 @@ const defaultRuleForm = {
 const ruleForm = reactive({ ...defaultRuleForm })
 
 // Helper functions
-function isTimeField(field) {
-  return ['seeding_time', 'added_time'].includes(field)
-}
-
-function isSizeField(field) {
-  return ['uploaded', 'downloaded', 'size'].includes(field)
-}
-
-function isSpeedField(field) {
-  return ['upload_speed', 'download_speed'].includes(field)
-}
-
 function getFieldLabel(field) {
   const labels = {
-    progress: '进度',
+    name: '种子名称',
+    progress: '种子进度',
+    uploadSpeed: '上传速度',
+    downloadSpeed: '下载速度',
+    category: '种子分类',
+    tags: '种子标签',
+    size: '选择大小',
+    totalSize: '种子大小',
+    state: '种子状态',
+    tracker: '站点域名',
+    trackerStatus: '返回信息',
+    completed: '已完成量',
+    downloaded: '已下载量',
+    uploaded: '已上传量',
+    ratio: '分享率一',
+    trueRatio: '分享率二',
+    ratio3: '分享率三',
+    addedTime: '添加时间',
+    completedTime: '完成时间',
+    savePath: '保存路径',
+    seeder: '做种连接',
+    leecher: '下载连接',
+    freeSpace: '剩余空间',
+    leechingCount: '下载任务',
+    seedingCount: '做种任务',
+    globalUploadSpeed: '全局上传',
+    globalDownloadSpeed: '全局下载',
+    secondFromZero: '当前时间',
     seeding_time: '做种时间',
-    uploaded: '上传量',
-    downloaded: '下载量',
-    ratio: '分享率',
-    upload_speed: '上传速度',
-    download_speed: '下载速度',
-    size: '大小',
-    seeders: '做种数',
-    leechers: '下载数',
-    added_time: '添加时间',
-    tracker: 'Tracker',
-    tags: '标签',
-    status: '状态',
   }
   return labels[field] || field
 }
 
 function getOperatorSymbol(op) {
-  const symbols = { gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', contains: '含', not_contains: '非' }
+  const symbols = {
+    gt: '>',
+    gte: '≥',
+    lt: '<',
+    lte: '≤',
+    eq: '=',
+    contains: '含',
+    not_contains: '非',
+    equals: '=',
+    bigger: '>',
+    smaller: '<',
+    contain: '含',
+    includeIn: '∈',
+    notContain: '非',
+    notIncludeIn: '∉',
+    regExp: '正则',
+    notRegExp: '非正则',
+  }
   return symbols[op] || op
 }
 
@@ -638,6 +741,14 @@ function formatSize(bytes) {
 
 function formatTime(timestamp) {
   return dayjs(timestamp).format('MM-DD HH:mm')
+}
+
+function formatSpeed(bytes) {
+  if (!bytes) return '0 B/s'
+  const k = 1024
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 function formatDuration(seconds) {
@@ -668,7 +779,12 @@ async function loadRecords() {
 function openRuleModal(rule = null) {
   editingRule.value = rule
   if (rule) {
-    Object.assign(ruleForm, { ...rule, conditions: rule.conditions.map(c => ({ ...c })) })
+    Object.assign(ruleForm, {
+      ...defaultRuleForm,
+      ...rule,
+      rule_type: rule.rule_type || 'normal',
+      conditions: rule.conditions.map(c => ({ ...c })),
+    })
   } else {
     Object.assign(ruleForm, { ...defaultRuleForm, conditions: [] })
   }
@@ -676,7 +792,7 @@ function openRuleModal(rule = null) {
 }
 
 function addCondition() {
-  ruleForm.conditions.push({ field: 'ratio', operator: 'gt', value: '', unit: '' })
+  ruleForm.conditions.push({ field: 'ratio', operator: 'bigger', value: '' })
 }
 
 function removeCondition(idx) {
@@ -684,8 +800,13 @@ function removeCondition(idx) {
 }
 
 async function saveRule() {
-  if (ruleForm.conditions.length === 0) {
+  if (ruleForm.rule_type === 'normal' && ruleForm.conditions.length === 0) {
     alert('请至少添加一个条件')
+    return
+  }
+
+  if (ruleForm.rule_type === 'javascript' && !ruleForm.code.trim()) {
+    alert('请填写 JavaScript 规则')
     return
   }
 
@@ -732,7 +853,12 @@ async function deleteRule(rule) {
 }
 
 function duplicateRule(rule) {
-  const newRule = { ...rule, name: rule.name + ' (副本)', conditions: rule.conditions.map(c => ({ ...c })) }
+  const newRule = {
+    ...defaultRuleForm,
+    ...rule,
+    name: rule.name + ' (副本)',
+    conditions: rule.conditions.map(c => ({ ...c }))
+  }
   delete newRule.id
   editingRule.value = null
   Object.assign(ruleForm, newRule)
@@ -768,9 +894,33 @@ async function runRule(rule) {
   }
 }
 
+async function loadDeleteInterval() {
+  try {
+    const response = await deleteRulesApi.getInterval()
+    deleteIntervalSeconds.value = response.data.seconds
+  } catch (error) {
+    console.error('Failed to load delete interval:', error)
+  }
+}
+
+async function saveDeleteInterval() {
+  savingInterval.value = true
+  try {
+    const response = await deleteRulesApi.updateInterval(deleteIntervalSeconds.value)
+    deleteIntervalSeconds.value = response.data.seconds
+    alert('删种间隔已更新')
+  } catch (error) {
+    console.error('Failed to save delete interval:', error)
+    alert(error.response?.data?.detail || '保存失败')
+  } finally {
+    savingInterval.value = false
+  }
+}
+
 onMounted(() => {
   loadRules()
   loadRecords()
+  loadDeleteInterval()
 })
 </script>
 

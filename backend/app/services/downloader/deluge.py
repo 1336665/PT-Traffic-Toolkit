@@ -111,7 +111,13 @@ class DelugeClient(BaseDownloader):
         trackers = data.get("trackers", [])
         next_announce_time = self._get_next_announce_time(trackers)
         announce_interval = self._get_announce_interval(trackers)
+        tracker_status = ""
+        for tracker_info in trackers:
+            tracker_status = tracker_info.get("message", "") or tracker_info.get("status", "")
+            if tracker_status:
+                break
 
+        total_size = data.get("total_size", 0)
         return TorrentInfo(
             hash=torrent_id,
             name=data.get("name", ""),
@@ -135,6 +141,12 @@ class DelugeClient(BaseDownloader):
             seeding_time=data.get("seeding_time", 0),
             next_announce_time=next_announce_time,
             announce_interval=announce_interval,
+            total_size=total_size,
+            selected_size=total_size,
+            completed=data.get("total_done", 0),
+            completed_time=None,
+            state=data.get("state", ""),
+            tracker_status=tracker_status,
         )
 
     def _get_next_announce_time(self, trackers: list) -> Optional[float]:
