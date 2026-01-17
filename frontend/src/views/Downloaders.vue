@@ -60,6 +60,22 @@
                 {{ formatSpeed(getStatus(dl.id)?.download_speed || 0) }}
               </p>
             </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">{{ $t('downloaders.activeTorrents') }}</span>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ getStatus(dl.id)?.active_torrents || 0 }} / {{ getStatus(dl.id)?.total_torrents || 0 }}
+              </p>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">{{ $t('dashboard.freeSpace') }}</span>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ formatSize(getStatus(dl.id)?.free_space || 0) }}
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            {{ $t('downloaders.seedingCount') }}: {{ getStatus(dl.id)?.seeding_torrents || 0 }}
+            · {{ $t('downloaders.downloadingCount') }}: {{ getStatus(dl.id)?.downloading_torrents || 0 }}
           </div>
         </div>
 

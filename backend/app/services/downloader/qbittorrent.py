@@ -94,12 +94,17 @@ class QBittorrentClient(BaseDownloader):
 
         added_on = data.get("added_on", 0)
         added_time = datetime.fromtimestamp(added_on) if added_on else None
+        completion_on = data.get("completion_on", 0)
+        completed_time = datetime.fromtimestamp(completion_on) if completion_on else None
 
         tags = data.get("tags", "")
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
         next_announce_time = self._normalize_next_announce(data.get("next_announce"))
 
+        total_size = data.get("total_size", 0) or data.get("size", 0)
+        selected_size = data.get("size", total_size)
+        completed = data.get("completed", data.get("downloaded", 0))
         return TorrentInfo(
             hash=data.get("hash", ""),
             name=data.get("name", ""),
@@ -123,6 +128,12 @@ class QBittorrentClient(BaseDownloader):
             seeding_time=data.get("seeding_time", 0),
             next_announce_time=next_announce_time,
             announce_interval=None,
+            total_size=total_size,
+            selected_size=selected_size,
+            completed=completed,
+            completed_time=completed_time,
+            state=data.get("state"),
+            tracker_status="",
         )
 
     def _normalize_next_announce(self, value: Optional[float]) -> Optional[float]:

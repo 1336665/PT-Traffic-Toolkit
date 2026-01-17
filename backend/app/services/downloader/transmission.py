@@ -110,6 +110,7 @@ class TransmissionClient(BaseDownloader):
 
         # Calculate seeding time
         done_date = data.get("doneDate", 0)
+        completed_time = datetime.fromtimestamp(done_date) if done_date else None
         if done_date > 0 and status == "seeding":
             seeding_time = int(datetime.now().timestamp() - done_date)
         else:
@@ -123,7 +124,15 @@ class TransmissionClient(BaseDownloader):
         tracker_stats = data.get("trackerStats", [])
         next_announce_time = self._get_next_announce_time(tracker_stats)
         announce_interval = self._get_announce_interval(tracker_stats)
+        tracker_status = ""
+        for stat in tracker_stats:
+            tracker_status = stat.get("lastAnnounceResult", "") or stat.get("lastAnnouncePeerCount", "")
+            if tracker_status:
+                break
 
+        total_size = data.get("totalSize", 0)
+        selected_size = data.get("sizeWhenDone", total_size)
+        completed = data.get("haveValid", 0) + data.get("haveUnchecked", 0)
         return TorrentInfo(
             hash=data.get("hashString", ""),
             name=data.get("name", ""),
@@ -147,6 +156,12 @@ class TransmissionClient(BaseDownloader):
             seeding_time=seeding_time,
             next_announce_time=next_announce_time,
             announce_interval=announce_interval,
+            total_size=total_size,
+            selected_size=selected_size,
+            completed=completed,
+            completed_time=completed_time,
+            state=status,
+            tracker_status=tracker_status,
         )
 
     def _get_next_announce_time(self, tracker_stats: list) -> Optional[float]:
@@ -185,7 +200,8 @@ class TransmissionClient(BaseDownloader):
             "uploadedEver", "downloadedEver", "uploadRatio", "rateUpload",
             "rateDownload", "seeders", "leechers", "peersGettingFromUs",
             "peersSendingToUs", "trackers", "labels", "downloadDir",
-            "addedDate", "doneDate", "secondsSeeding", "error", "trackerStats"
+            "addedDate", "doneDate", "secondsSeeding", "error", "trackerStats",
+            "sizeWhenDone", "haveValid", "haveUnchecked"
         ]
 
         result = await self._rpc_call("torrent-get", {"fields": fields})
@@ -201,7 +217,8 @@ class TransmissionClient(BaseDownloader):
             "uploadedEver", "downloadedEver", "uploadRatio", "rateUpload",
             "rateDownload", "seeders", "leechers", "peersGettingFromUs",
             "peersSendingToUs", "trackers", "labels", "downloadDir",
-            "addedDate", "doneDate", "secondsSeeding", "error", "trackerStats"
+            "addedDate", "doneDate", "secondsSeeding", "error", "trackerStats",
+            "sizeWhenDone", "haveValid", "haveUnchecked"
         ]
 
         # Transmission uses ID or hash

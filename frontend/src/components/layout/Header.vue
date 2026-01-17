@@ -54,7 +54,7 @@
         >
           <div
             v-if="notificationOpen"
-            class="absolute left-2 right-2 sm:left-auto sm:right-0 mt-2 sm:w-80 rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-50"
+            class="fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:left-auto sm:right-0 sm:mt-2 sm:w-80 rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-50"
           >
             <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
               <div class="flex items-center justify-between">

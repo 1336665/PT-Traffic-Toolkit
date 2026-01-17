@@ -28,6 +28,12 @@ class TorrentInfo:
     seeding_time: int  # seconds
     next_announce_time: Optional[float] = None  # unix timestamp seconds
     announce_interval: Optional[int] = None  # seconds
+    total_size: Optional[int] = None
+    selected_size: Optional[int] = None
+    completed: Optional[int] = None
+    completed_time: Optional[datetime] = None
+    state: Optional[str] = None
+    tracker_status: str = ""
 
 
 @dataclass
