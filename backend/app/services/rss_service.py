@@ -2,7 +2,7 @@ import re
 import asyncio
 from datetime import datetime
 from typing import List, Optional, Tuple
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
@@ -21,6 +21,71 @@ class RssService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _get_base_url(self, link: str, feed_url: str) -> str:
+        """Resolve base URL from entry link or feed URL."""
+        parsed = urlparse(link or "")
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+        parsed = urlparse(feed_url or "")
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+        return ""
+
+    def _merge_passkey_params(self, download_link: str, feed_url: str) -> str:
+        """Append passkey-style params from feed URL if missing."""
+        if not download_link or not feed_url:
+            return download_link
+
+        passkey_params = {"passkey", "authkey", "torrent_pass"}
+        feed_params = parse_qs(urlparse(feed_url).query)
+        extra = {k: v[0] for k, v in feed_params.items() if k in passkey_params and v}
+        if not extra:
+            return download_link
+
+        parsed_link = urlparse(download_link)
+        link_params = parse_qs(parsed_link.query)
+        updated = False
+        for key, value in extra.items():
+            if key not in link_params:
+                link_params[key] = [value]
+                updated = True
+
+        if not updated:
+            return download_link
+
+        new_query = urlencode({k: v[0] for k, v in link_params.items()})
+        return urlunparse(parsed_link._replace(query=new_query))
+
+    def _normalize_download_link(self, download_link: str, feed: RssFeed) -> str:
+        """Normalize download link for common PT patterns."""
+        if not download_link:
+            return download_link
+
+        if download_link.startswith('magnet:'):
+            return download_link
+
+        base_url = self._get_base_url(download_link, feed.url or "")
+        parsed_link = urlparse(download_link)
+
+        # Handle relative URLs
+        if not parsed_link.scheme and base_url:
+            download_link = urljoin(base_url, download_link)
+            parsed_link = urlparse(download_link)
+
+        # If link is a detail page, convert to download.php?id=xxx
+        query = parse_qs(parsed_link.query)
+        torrent_id = (query.get('torrentid') or query.get('id') or [""])[0]
+        if torrent_id and (
+            parsed_link.path.endswith('details.php')
+            or parsed_link.path.endswith('torrents.php')
+            or 'detail' in parsed_link.path
+        ):
+            download_link = urljoin(base_url, f"/download.php?id={torrent_id}")
+
+        # Append passkey/authkey if provided in feed URL
+        download_link = self._merge_passkey_params(download_link, feed.url or "")
+        return download_link
 
     async def fetch_feed(self, feed: RssFeed) -> List[dict]:
         """Fetch and parse RSS feed"""
@@ -114,23 +179,10 @@ class RssService:
                     logger.debug(f"Found enclosure rel link: {lnk_href[:80]}...")
                     break
 
-        # Fallback: convert detail page link to download link for common PT patterns
-        if download_link == link and download_link and not download_link.startswith('magnet:'):
-            if not download_link.endswith('.torrent'):
-                id_match = re.search(r'(?:details\.php|torrents\.php|detail)\?id=(\d+)', download_link)
-                if id_match:
-                    torrent_id = id_match.group(1)
-                    parsed = urlparse(download_link)
-                    if parsed.scheme and parsed.netloc:
-                        base_url = f"{parsed.scheme}://{parsed.netloc}"
-                    elif feed.url:
-                        parsed = urlparse(feed.url)
-                        base_url = f"{parsed.scheme}://{parsed.netloc}"
-                    else:
-                        base_url = ""
-                    if base_url:
-                        download_link = urljoin(base_url, f"/download.php?id={torrent_id}")
-                        logger.debug(f"Derived download link: {download_link[:80]}...")
+        # Normalize download link (relative URLs, passkey params, detail -> download)
+        if download_link:
+            download_link = self._normalize_download_link(download_link, feed)
+            logger.debug(f"Normalized download link: {download_link[:80]}...")
 
         # Extract size from various possible fields
         size = 0

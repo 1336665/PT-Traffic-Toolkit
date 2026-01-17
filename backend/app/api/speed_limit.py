@@ -152,6 +152,7 @@ async def get_status(
 ):
     """Get current speed limiting status"""
     service = SpeedLimiterService(db)
+    await service.load_state()
     return service.get_status()
 
 
