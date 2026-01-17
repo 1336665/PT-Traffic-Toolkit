@@ -777,14 +777,14 @@ class SpeedLimiterService:
         site_rules = await self.get_site_rules()
         site_rule_map = {r.tracker_domain: r for r in site_rules}
 
-        # 获取所有启用自动限速的下载器
+        # 获取所有启用的下载器
         result = await self.db.execute(
-            select(Downloader).where(
-                Downloader.enabled == True,
-                Downloader.auto_speed_limit == True
-            )
+            select(Downloader).where(Downloader.enabled == True)
         )
         downloaders = result.scalars().all()
+        auto_downloaders = [dl for dl in downloaders if dl.auto_speed_limit]
+        if auto_downloaders:
+            downloaders = auto_downloaders
 
         results = {}
         now = time.time()

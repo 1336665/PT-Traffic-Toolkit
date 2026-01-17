@@ -27,6 +27,15 @@ chmod +x install.sh
 
 Access the application at `http://localhost:8080`
 
+### Interactive Management Script
+
+```bash
+chmod +x pt-manager.sh
+./pt-manager.sh
+```
+
+The script provides an interactive menu for install, start, stop, restart, update, status, and logs.
+
 ### Manual Installation
 
 #### Backend

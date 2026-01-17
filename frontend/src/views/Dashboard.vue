@@ -66,8 +66,8 @@
               </div>
             </div>
             <div v-if="dl.online" class="text-right">
-              <div class="text-xs text-blue-500">â†?{{ formatSpeed(dl.upload_speed) }}</div>
-              <div class="text-xs text-green-500">â†?{{ formatSpeed(dl.download_speed) }}</div>
+              <div class="text-xs text-blue-500">â†‘ {{ formatSpeed(dl.upload_speed) }}</div>
+              <div class="text-xs text-green-500">â†“ {{ formatSpeed(dl.download_speed) }}</div>
             </div>
             <span v-else class="badge-danger">{{ $t('common.offline') }}</span>
           </div>
