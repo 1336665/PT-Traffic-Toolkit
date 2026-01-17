@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6 ">
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center space-x-3">
         <div class="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
           <TrashIcon class="w-6 h-6 text-white" />
@@ -12,13 +12,6 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <div class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-800">
-          <span class="text-sm text-gray-600 dark:text-gray-300">运行间隔(秒)</span>
-          <input v-model.number="deleteIntervalSeconds" type="number" min="5" class="form-input w-24 text-sm" />
-          <Button variant="secondary" size="sm" :loading="savingInterval" @click="saveDeleteInterval">
-            保存
-          </Button>
-        </div>
         <Button variant="primary" @click="openRuleModal()">
           <PlusIcon class="w-4 h-4" />
           添加规则
@@ -74,6 +67,29 @@
       </div>
     </div>
 
+    <!-- Advanced Settings -->
+    <Card>
+      <template #header>
+        <div class="flex items-center justify-between w-full">
+          <div>
+            <h3 class="font-semibold text-gray-900 dark:text-white">高级设置</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">调整删种任务运行间隔</p>
+          </div>
+        </div>
+      </template>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="text-sm text-gray-600 dark:text-gray-300">
+          运行间隔(秒)
+        </div>
+        <div class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-800">
+          <input v-model.number="deleteIntervalSeconds" type="number" min="5" class="form-input w-24 text-sm" />
+          <Button variant="secondary" size="sm" :loading="savingInterval" @click="saveDeleteInterval">
+            保存
+          </Button>
+        </div>
+      </div>
+    </Card>
+
     <!-- Rules List - Modern Vertex Style Cards -->
     <div v-if="rules.length > 0" class="grid gap-4 lg:grid-cols-2">
       <div
@@ -82,7 +98,7 @@
         class="card card-hover overflow-hidden"
       >
         <!-- Card Header -->
-        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center space-x-4">
             <div
               class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
@@ -94,7 +110,7 @@
             </div>
             <div>
               <h3 class="font-semibold text-gray-900 dark:text-white">{{ rule.name }}</h3>
-              <div class="flex items-center space-x-2 mt-1">
+              <div class="flex flex-wrap items-center gap-2 mt-1">
                 <span class="text-xs text-gray-500 dark:text-gray-400">
                   优先级: {{ rule.priority }}
                 </span>
@@ -102,6 +118,10 @@
                 <span :class="rule.enabled ? 'text-green-500' : 'text-gray-400'" class="text-xs flex items-center">
                   <span class="w-1.5 h-1.5 rounded-full mr-1" :class="rule.enabled ? 'bg-green-500' : 'bg-gray-400'"></span>
                   {{ rule.enabled ? '已启用' : '已禁用' }}
+                </span>
+                <span class="text-gray-300 dark:text-gray-600">|</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  持续: {{ ruleDurationLabel(rule.duration_seconds) }}
                 </span>
               </div>
             </div>
@@ -138,7 +158,7 @@
               <div
                 v-for="(cond, idx) in rule.conditions"
                 :key="idx"
-                class="flex items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+                class="flex flex-col gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm sm:flex-row sm:items-center"
               >
                 <span class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs font-bold mr-3">
                   {{ idx + 1 }}
@@ -163,10 +183,6 @@
           <div class="flex flex-wrap gap-2">
             <span class="badge badge-gray">
               {{ rule.rule_type === 'javascript' ? 'JavaScript' : '普通' }}
-            </span>
-            <span v-if="rule.duration_seconds" class="badge badge-info">
-              <ClockIcon class="w-3 h-3 mr-1" />
-              持续 {{ formatDuration(rule.duration_seconds) }}
             </span>
             <span :class="rule.delete_files ? 'badge badge-danger' : 'badge badge-success'">
               {{ rule.delete_files ? '删除文件' : '仅移除' }}
@@ -193,8 +209,8 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700/50 flex justify-between">
-          <div class="flex space-x-2">
+        <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700/50 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" @click="previewRule(rule)" :loading="previewingRule === rule.id">
               <EyeIcon class="w-4 h-4" />
               预览
@@ -204,7 +220,7 @@
               执行
             </Button>
           </div>
-          <div class="flex space-x-1">
+          <div class="flex flex-wrap gap-1">
             <button @click="duplicateRule(rule)" class="btn-icon text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title="复制规则">
               <DocumentDuplicateIcon class="w-5 h-5" />
             </button>
@@ -756,6 +772,11 @@ function formatDuration(seconds) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}小时`
   return `${Math.floor(seconds / 86400)}天`
+}
+
+function ruleDurationLabel(seconds) {
+  if (!seconds) return '立即'
+  return formatDuration(seconds)
 }
 
 async function loadRules() {
