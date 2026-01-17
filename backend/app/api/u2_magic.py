@@ -66,12 +66,13 @@ async def fetch_magic(
     """Manually fetch and process U2 magic"""
     service = U2MagicService(db)
     try:
-        records = await service.process_magic()
-        downloaded = [r for r in records if r.downloaded]
+        result = await service.process_magic()
+        if not result:
+            return {"message": "Magic fetched", "total": 0, "downloaded": 0}
         return {
             "message": "Magic fetched",
-            "total": len(records),
-            "downloaded": len(downloaded),
+            "total": result.get("total", 0),
+            "downloaded": result.get("downloaded", 0),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

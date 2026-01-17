@@ -201,10 +201,11 @@ class TaskScheduler:
 
                 if config and config.enabled:
                     service = U2MagicService(db)
-                    records = await service.process_magic()
-                    if records:
-                        downloaded = sum(1 for r in records if r.downloaded)
-                        logger.info(f"U2 magic: {len(records)} found, {downloaded} downloaded")
+                    result = await service.process_magic()
+                    if result:
+                        total = result.get("total", 0)
+                        downloaded = result.get("downloaded", 0)
+                        logger.info(f"U2 magic: {total} found, {downloaded} downloaded")
         except Exception as e:
             logger.error(f"U2 magic error: {e}")
 

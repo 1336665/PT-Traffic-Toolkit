@@ -337,6 +337,7 @@ class U2MagicConfigBase(BaseModel):
     enabled: bool = False
     cookie: str = ""
     api_token: str = ""
+    uid: int = 0
     backup_dir: str = ""
     watch_dir: str = ""
     fetch_interval: int = 60
@@ -346,6 +347,14 @@ class U2MagicConfigBase(BaseModel):
     min_size: float = 0
     max_size: float = 0
     categories: str = ""
+    min_day: int = 7
+    download_non_free: bool = False
+    magic_self: bool = False
+    effective_delay: int = 60
+    download_dead: bool = False
+    da_qiao: bool = True
+    min_add_interval: int = 0
+    name_filter: str = ""
     downloader_id: Optional[int] = None
 
 
