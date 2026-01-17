@@ -436,27 +436,36 @@ class U2MagicService:
                 if len(contents) > 5:
                     size_str = contents[5].strip() if hasattr(contents[5], 'strip') else ''
                     size_str = size_str.replace(',', '.').replace('Б', 'B')
-                    try:
-                        parts = size_str.split(' ')
+                    size_bytes = parse_size(size_str)
+                    if size_bytes == 0:
+                        parts = size_str.split()
                         if len(parts) >= 2:
-                            num = float(parts[0])
-                            unit = parts[1]
+                            try:
+                                num = float(parts[0])
+                                unit = parts[1]
+                            except ValueError:
+                                num = 0
+                                unit = ""
                             unit_map = {
-                                'MiB': -1, 'GiB': 0, 'TiB': 1,
-                                '喵': -1, '寄': 0, '烫': 1,
-                                'egamay': -1, 'igagay': 0, 'eratay': 1,
+                                'MIB': 1024 ** 2,
+                                'GIB': 1024 ** 3,
+                                'TIB': 1024 ** 4,
+                                '喵': 1024 ** 2,
+                                '寄': 1024 ** 3,
+                                '烫': 1024 ** 4,
+                                'EGAMAY': 1024 ** 2,
+                                'IGAGAY': 1024 ** 3,
+                                'ERATAY': 1024 ** 4,
                             }
-                            power = unit_map.get(unit, 0)
-                            gb = num * (1024 ** power)
-
-                            if config.min_size > 0 and gb < config.min_size:
-                                logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 小于最小值")
-                                return None
-                            if config.max_size > 0 and gb > config.max_size:
-                                logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 大于最大值")
-                                return None
-                    except:
-                        pass
+                            size_bytes = int(num * unit_map.get(unit.upper(), 0))
+                    if size_bytes > 0:
+                        gb = size_bytes / (1024 ** 3)
+                        if config.min_size > 0 and gb < config.min_size:
+                            logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 小于最小值")
+                            return None
+                        if config.max_size > 0 and gb > config.max_size:
+                            logger.debug(f"种子 {tid} 体积 {gb:.2f}GB 大于最大值")
+                            return None
 
         # 获取时区
         tz = self._get_timezone(soup)

@@ -79,7 +79,7 @@ class RssService:
     def extract_torrent_info(self, entry: dict, feed: RssFeed) -> dict:
         """Extract torrent information from RSS entry with support for various PT site formats"""
         title = entry.get('title', '')
-        link = entry.get('link', '')
+        link = entry.get('link', '') or entry.get('id', '') or entry.get('guid', '')
 
         logger.debug(f"Extracting info for: {title[:50]}...")
 
@@ -113,6 +113,24 @@ class RssService:
                     download_link = lnk_href
                     logger.debug(f"Found enclosure rel link: {lnk_href[:80]}...")
                     break
+
+        # Fallback: convert detail page link to download link for common PT patterns
+        if download_link == link and download_link and not download_link.startswith('magnet:'):
+            if not download_link.endswith('.torrent'):
+                id_match = re.search(r'(?:details\.php|torrents\.php|detail)\?id=(\d+)', download_link)
+                if id_match:
+                    torrent_id = id_match.group(1)
+                    parsed = urlparse(download_link)
+                    if parsed.scheme and parsed.netloc:
+                        base_url = f"{parsed.scheme}://{parsed.netloc}"
+                    elif feed.url:
+                        parsed = urlparse(feed.url)
+                        base_url = f"{parsed.scheme}://{parsed.netloc}"
+                    else:
+                        base_url = ""
+                    if base_url:
+                        download_link = urljoin(base_url, f"/download.php?id={torrent_id}")
+                        logger.debug(f"Derived download link: {download_link[:80]}...")
 
         # Extract size from various possible fields
         size = 0
@@ -188,6 +206,34 @@ class RssService:
                     break
                 except (ValueError, TypeError):
                     pass
+
+        torrent_meta = entry.get('torrent')
+        if isinstance(torrent_meta, dict):
+            if seeders == 0 and 'seeds' in torrent_meta:
+                try:
+                    seeders = int(torrent_meta['seeds'])
+                    logger.debug(f"Found seeders from torrent meta: {seeders}")
+                except (ValueError, TypeError):
+                    pass
+            if leechers == 0 and 'peers' in torrent_meta:
+                try:
+                    leechers = int(torrent_meta['peers'])
+                    logger.debug(f"Found leechers from torrent meta: {leechers}")
+                except (ValueError, TypeError):
+                    pass
+
+        # Fallback: parse seeders/leechers from description text
+        if seeders == 0 or leechers == 0:
+            description = entry.get('description', '') or entry.get('summary', '') or ''
+            if description:
+                seed_match = re.search(r'(?:seeds?|seeders?|做种|做種)[:：]?\s*(\d+)', description, re.IGNORECASE)
+                leech_match = re.search(r'(?:leechers?|peers?|下载|吸血)[:：]?\s*(\d+)', description, re.IGNORECASE)
+                if seeders == 0 and seed_match:
+                    seeders = int(seed_match.group(1))
+                    logger.debug(f"Parsed seeders from description: {seeders}")
+                if leechers == 0 and leech_match:
+                    leechers = int(leech_match.group(1))
+                    logger.debug(f"Parsed leechers from description: {leechers}")
 
         # Check for HR (Hit and Run) in title/description
         is_hr = False
