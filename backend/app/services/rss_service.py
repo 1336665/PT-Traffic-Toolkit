@@ -333,8 +333,11 @@ class RssService:
                 break
 
         categories = []
-        if entry.get('category'):
-            categories.append(str(entry.get('category')))
+        entry_category = entry.get('category')
+        if isinstance(entry_category, (list, tuple)):
+            categories.extend([str(item) for item in entry_category if str(item).strip()])
+        elif entry_category:
+            categories.append(str(entry_category))
         for tag in entry.get('tags', []) or []:
             term = tag.get('term') if isinstance(tag, dict) else str(tag)
             if term:
@@ -435,18 +438,27 @@ class RssService:
             return False, "Not free"
 
         # Keyword filters
-        title = info['title'].lower()
+        description = info.get('description', '')
+        categories = info.get('categories', [])
+        combined_text = " ".join([info['title'], description, " ".join(categories)]).lower()
 
         if feed.include_keywords:
             include_list = [k.strip().lower() for k in feed.include_keywords.split(',') if k.strip()]
-            if include_list and not any(kw in title for kw in include_list):
+            if include_list and not any(kw in combined_text for kw in include_list):
                 return False, f"No matching include keywords: {feed.include_keywords}"
 
         if feed.exclude_keywords:
             exclude_list = [k.strip().lower() for k in feed.exclude_keywords.split(',') if k.strip()]
             for kw in exclude_list:
-                if kw in title:
+                if kw in combined_text:
                     return False, f"Matched exclude keyword: {kw}"
+
+        # Category filters
+        if feed.categories:
+            category_list = [c.strip().lower() for c in feed.categories.split(',') if c.strip()]
+            category_text = " ".join(categories).lower()
+            if category_list and not any(c in category_text or c in combined_text for c in category_list):
+                return False, f"No matching categories: {feed.categories}"
 
         return True, ""
 
