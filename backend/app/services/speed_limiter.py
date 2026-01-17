@@ -424,6 +424,8 @@ class TorrentState:
     last_reannounce: float = 0.0
     reannounced_this_cycle: bool = False
     waiting_reannounce: bool = False
+    next_announce_time: Optional[float] = None
+    announce_interval: Optional[int] = None
 
     # 控制器
     pid: PIDController = field(default_factory=PIDController)
@@ -436,6 +438,11 @@ class TorrentState:
 
     def get_time_left(self, now: float) -> float:
         """获取距离下次汇报的剩余时间"""
+        if self.next_announce_time and self.next_announce_time > 0:
+            remaining = max(0, self.next_announce_time - now)
+            if self.announce_interval and remaining > self.announce_interval:
+                remaining = self.announce_interval
+            return remaining
         if self.last_announce_time and self.last_announce_time > 0:
             interval = self.get_announce_interval()
             next_announce = self.last_announce_time + interval
@@ -445,6 +452,8 @@ class TorrentState:
         if self.cycle_synced and self.cycle_interval > 0:
             return max(1, self.cycle_interval)
 
+        if self.announce_interval:
+            return max(1, self.announce_interval)
         return estimate_announce_interval(self.time_added)
 
     def get_announce_interval(self) -> int:
@@ -506,6 +515,8 @@ class TorrentState:
             'last_reannounce': self.last_reannounce,
             'reannounced_this_cycle': self.reannounced_this_cycle,
             'waiting_reannounce': self.waiting_reannounce,
+            'next_announce_time': self.next_announce_time,
+            'announce_interval': self.announce_interval,
             'current_limit': self.current_limit,
             'phase': self.phase,
             'pid_state': self.pid.get_state(),
@@ -532,6 +543,8 @@ class TorrentState:
             last_reannounce=data.get('last_reannounce', 0),
             reannounced_this_cycle=data.get('reannounced_this_cycle', False),
             waiting_reannounce=data.get('waiting_reannounce', False),
+            next_announce_time=data.get('next_announce_time'),
+            announce_interval=data.get('announce_interval'),
             current_limit=data.get('current_limit', 0),
             phase=data.get('phase', C.PHASE_WARMUP),
         )
@@ -698,7 +711,12 @@ class SpeedLimiterService:
                 time_added=torrent.added_time.timestamp() if torrent.added_time else time.time(),
                 total_size=torrent.size,
                 total_uploaded=torrent.uploaded,
+                next_announce_time=torrent.next_announce_time,
+                announce_interval=torrent.announce_interval,
             )
+        else:
+            self.states[torrent.hash].next_announce_time = torrent.next_announce_time
+            self.states[torrent.hash].announce_interval = torrent.announce_interval
         return self.states[torrent.hash]
 
     def _calculate_limit(

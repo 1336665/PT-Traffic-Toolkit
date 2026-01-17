@@ -108,6 +108,9 @@ class DelugeClient(BaseDownloader):
         # Labels/tags
         label = data.get("label", "")
         tags = [label] if label else []
+        trackers = data.get("trackers", [])
+        next_announce_time = self._get_next_announce_time(trackers)
+        announce_interval = self._get_announce_interval(trackers)
 
         return TorrentInfo(
             hash=torrent_id,
@@ -130,7 +133,39 @@ class DelugeClient(BaseDownloader):
             save_path=data.get("save_path", ""),
             added_time=added_time,
             seeding_time=data.get("seeding_time", 0),
+            next_announce_time=next_announce_time,
+            announce_interval=announce_interval,
         )
+
+    def _get_next_announce_time(self, trackers: list) -> Optional[float]:
+        if not trackers:
+            return None
+        next_times = []
+        for tracker in trackers:
+            value = tracker.get("next_announce")
+            if value:
+                try:
+                    next_times.append(float(value))
+                except (TypeError, ValueError):
+                    continue
+        if not next_times:
+            return None
+        return min(next_times)
+
+    def _get_announce_interval(self, trackers: list) -> Optional[int]:
+        if not trackers:
+            return None
+        intervals = []
+        for tracker in trackers:
+            value = tracker.get("announce_interval")
+            if value:
+                try:
+                    intervals.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+        if not intervals:
+            return None
+        return min(intervals)
 
     async def get_torrents(self) -> List[TorrentInfo]:
         fields = [
@@ -138,7 +173,7 @@ class DelugeClient(BaseDownloader):
             "total_done", "ratio", "upload_payload_rate", "download_payload_rate",
             "total_seeds", "total_peers", "num_seeds", "num_peers",
             "tracker_host", "tracker", "label", "save_path", "time_added",
-            "seeding_time"
+            "seeding_time", "trackers"
         ]
 
         result = await self._rpc_call("core.get_torrents_status", [{}, fields])
@@ -153,7 +188,7 @@ class DelugeClient(BaseDownloader):
             "total_done", "ratio", "upload_payload_rate", "download_payload_rate",
             "total_seeds", "total_peers", "num_seeds", "num_peers",
             "tracker_host", "tracker", "label", "save_path", "time_added",
-            "seeding_time"
+            "seeding_time", "trackers"
         ]
 
         result = await self._rpc_call("core.get_torrent_status", [torrent_hash, fields])

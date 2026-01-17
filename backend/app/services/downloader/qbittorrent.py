@@ -98,6 +98,8 @@ class QBittorrentClient(BaseDownloader):
         tags = data.get("tags", "")
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
+        next_announce_time = self._normalize_next_announce(data.get("next_announce"))
+
         return TorrentInfo(
             hash=data.get("hash", ""),
             name=data.get("name", ""),
@@ -119,7 +121,24 @@ class QBittorrentClient(BaseDownloader):
             save_path=data.get("save_path", ""),
             added_time=added_time,
             seeding_time=data.get("seeding_time", 0),
+            next_announce_time=next_announce_time,
+            announce_interval=None,
         )
+
+    def _normalize_next_announce(self, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return None
+        if value <= 0:
+            return None
+        now = datetime.now().timestamp()
+        # qBittorrent may return seconds-until or unix timestamp.
+        if value > now + 60:
+            return value
+        return now + value
 
     def _calculate_torrent_hash(self, torrent_data: bytes) -> Optional[str]:
         """Calculate info_hash from torrent file content"""

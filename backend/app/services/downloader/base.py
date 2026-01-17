@@ -26,6 +26,8 @@ class TorrentInfo:
     save_path: str
     added_time: Optional[datetime]
     seeding_time: int  # seconds
+    next_announce_time: Optional[float] = None  # unix timestamp seconds
+    announce_interval: Optional[int] = None  # seconds
 
 
 @dataclass
