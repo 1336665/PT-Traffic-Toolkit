@@ -170,6 +170,7 @@ class RssService:
         """Extract torrent information from RSS entry with support for various PT site formats"""
         title = entry.get('title', '')
         link = entry.get('link', '') or entry.get('id', '') or entry.get('guid', '')
+        description = entry.get('description', '') or entry.get('summary', '')
 
         logger.debug(f"Extracting info for: {title[:50]}...")
 
@@ -331,15 +332,25 @@ class RssService:
                 logger.debug(f"Found Free marker: {kw}")
                 break
 
+        categories = []
+        if entry.get('category'):
+            categories.append(str(entry.get('category')))
+        for tag in entry.get('tags', []) or []:
+            term = tag.get('term') if isinstance(tag, dict) else str(tag)
+            if term:
+                categories.append(str(term))
+
         info = {
             'title': title,
             'link': download_link,
+            'description': description,
             'size': size,
             'seeders': seeders,
             'leechers': leechers,
             'is_hr': is_hr,
             'is_free': is_free,
             'torrent_hash': '',
+            'categories': [c.strip() for c in categories if str(c).strip()],
         }
 
         logger.debug(f"Extracted info: title='{title[:30]}...', link='{download_link[:50]}...', size={size}, seeders={seeders}")
