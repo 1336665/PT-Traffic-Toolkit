@@ -26,6 +26,7 @@ deluge-client==1.10.2
 
 # RSS parsing
 feedparser==6.0.10
+quickjs==1.19.2
 
 # HTML parsing
 beautifulsoup4==4.12.3
