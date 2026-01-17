@@ -92,11 +92,16 @@ class RssService:
         logger.info(f"Fetching RSS feed '{feed.name}' from {feed.url[:80]}...")
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, verify=False) as client:
+                base_url = self._get_base_url(feed.url or "", feed.url or "")
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Accept": "application/rss+xml, application/xml, text/xml, */*",
                     "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+                    "Cache-Control": "no-cache",
                 }
+                if base_url:
+                    headers["Referer"] = base_url
+                    headers["Origin"] = base_url
                 if feed.site_cookie:
                     headers["Cookie"] = feed.site_cookie
                     logger.debug(f"Using cookie for feed '{feed.name}'")
