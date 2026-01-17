@@ -219,6 +219,15 @@ class U2MagicService:
                             pass
         except Exception as e:
             logger.debug(f"解析流量优惠失败: {e}")
+        try:
+            promo_text = td.get_text(" ", strip=True).lower()
+            if re.search(r'2x', promo_text) and ('free' in promo_text or '免费' in promo_text):
+                pro['ur'] = 2.0
+                pro['dr'] = 0.0
+            elif 'free' in promo_text or '免费' in promo_text:
+                pro['dr'] = 0.0
+        except Exception:
+            pass
         return pro
 
     def _extract_size_bytes(self, soup: BeautifulSoup) -> int:

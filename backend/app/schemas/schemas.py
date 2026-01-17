@@ -101,6 +101,10 @@ class DownloaderStatus(BaseModel):
     free_space: float = 0
     active_torrents: int = 0
     total_torrents: int = 0
+    seeding_torrents: int = 0
+    downloading_torrents: int = 0
+    total_uploaded: float = 0
+    total_downloaded: float = 0
 
 
 # ============ RSS Schemas ============
@@ -209,6 +213,11 @@ class DeleteRuleBase(BaseModel):
     delete_files: bool = True
     force_report: bool = True
     max_delete_count: int = 0
+    pause: bool = False
+    only_delete_torrent: bool = False
+    limit_speed: int = 0
+    rule_type: str = "normal"
+    code: str = ""
     downloader_ids: List[int] = []
     tracker_filter: str = ""
     tag_filter: str = ""
@@ -228,6 +237,11 @@ class DeleteRuleUpdate(BaseModel):
     delete_files: Optional[bool] = None
     force_report: Optional[bool] = None
     max_delete_count: Optional[int] = None
+    pause: Optional[bool] = None
+    only_delete_torrent: Optional[bool] = None
+    limit_speed: Optional[int] = None
+    rule_type: Optional[str] = None
+    code: Optional[str] = None
     downloader_ids: Optional[List[int]] = None
     tracker_filter: Optional[str] = None
     tag_filter: Optional[str] = None
@@ -412,6 +426,12 @@ class TorrentInfo(BaseModel):
     save_path: str
     added_time: Optional[datetime]
     seeding_time: int
+    total_size: Optional[float] = None
+    selected_size: Optional[float] = None
+    completed: Optional[float] = None
+    completed_time: Optional[datetime] = None
+    state: Optional[str] = None
+    tracker_status: Optional[str] = ""
 
 
 # ============ Dashboard Schemas ============

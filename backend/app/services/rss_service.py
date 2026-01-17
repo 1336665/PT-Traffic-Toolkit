@@ -87,26 +87,46 @@ class RssService:
         download_link = self._merge_passkey_params(download_link, feed.url or "")
         return download_link
 
+    def _parse_cookie(self, cookie_str: str) -> dict:
+        if not cookie_str:
+            return {}
+        cookies = {}
+        for part in cookie_str.split(";"):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if key:
+                    cookies[key] = value
+        return cookies
+
     async def fetch_feed(self, feed: RssFeed) -> List[dict]:
         """Fetch and parse RSS feed"""
         logger.info(f"Fetching RSS feed '{feed.name}' from {feed.url[:80]}...")
         try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, verify=False) as client:
-                base_url = self._get_base_url(feed.url or "", feed.url or "")
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "application/rss+xml, application/xml, text/xml, */*",
-                    "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
-                    "Cache-Control": "no-cache",
-                }
-                if base_url:
-                    headers["Referer"] = base_url
-                    headers["Origin"] = base_url
-                if feed.site_cookie:
-                    headers["Cookie"] = feed.site_cookie
-                    logger.debug(f"Using cookie for feed '{feed.name}'")
+            base_url = self._get_base_url(feed.url or "", feed.url or "")
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/rss+xml, application/xml, text/xml, */*",
+                "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+                "Cache-Control": "no-cache",
+                "Accept-Encoding": "gzip, deflate, br",
+            }
+            if base_url:
+                headers["Referer"] = base_url
+                headers["Origin"] = base_url
+            cookies = self._parse_cookie(feed.site_cookie)
+            if cookies:
+                logger.debug(f"Using cookie for feed '{feed.name}'")
 
-                response = await client.get(feed.url, headers=headers)
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                follow_redirects=True,
+                verify=False,
+                headers=headers,
+                cookies=cookies,
+            ) as client:
+                response = await client.get(feed.url)
                 response.raise_for_status()
 
                 content = response.text
@@ -150,6 +170,7 @@ class RssService:
         """Extract torrent information from RSS entry with support for various PT site formats"""
         title = entry.get('title', '')
         link = entry.get('link', '') or entry.get('id', '') or entry.get('guid', '')
+        description = entry.get('description', '') or entry.get('summary', '')
 
         logger.debug(f"Extracting info for: {title[:50]}...")
 
@@ -311,15 +332,25 @@ class RssService:
                 logger.debug(f"Found Free marker: {kw}")
                 break
 
+        categories = []
+        if entry.get('category'):
+            categories.append(str(entry.get('category')))
+        for tag in entry.get('tags', []) or []:
+            term = tag.get('term') if isinstance(tag, dict) else str(tag)
+            if term:
+                categories.append(str(term))
+
         info = {
             'title': title,
             'link': download_link,
+            'description': description,
             'size': size,
             'seeders': seeders,
             'leechers': leechers,
             'is_hr': is_hr,
             'is_free': is_free,
             'torrent_hash': '',
+            'categories': [c.strip() for c in categories if str(c).strip()],
         }
 
         logger.debug(f"Extracted info: title='{title[:30]}...', link='{download_link[:50]}...', size={size}, seeders={seeders}")

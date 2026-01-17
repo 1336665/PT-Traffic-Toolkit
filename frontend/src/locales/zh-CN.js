@@ -138,6 +138,8 @@ export default {
     diskUsage: '磁盘使用',
     activeTorrents: '活跃种子',
     totalTorrents: '种子总数',
+    seedingCount: '做种任务',
+    downloadingCount: '下载任务',
     noTorrents: '暂无种子',
     torrents: '种子列表',
     torrentName: '种子名称',

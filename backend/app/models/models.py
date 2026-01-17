@@ -158,6 +158,11 @@ class DeleteRule(Base):
     delete_files = Column(Boolean, default=True)
     force_report = Column(Boolean, default=True)  # Report before delete
     max_delete_count = Column(Integer, default=0)  # Per run, 0 = unlimited
+    pause = Column(Boolean, default=False)
+    only_delete_torrent = Column(Boolean, default=False)
+    limit_speed = Column(Integer, default=0)  # bytes/s, 0 = disabled
+    rule_type = Column(String(20), default="normal")  # normal/javascript
+    code = Column(Text, default="")
 
     # Scope
     downloader_ids = Column(JSON, default=list)  # Empty = all downloaders
