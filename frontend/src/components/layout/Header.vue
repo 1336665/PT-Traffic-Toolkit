@@ -34,6 +34,7 @@
       <!-- 通知按钮 -->
       <button
         class="relative p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        @click="openNotifications"
       >
         <BellIcon class="h-5 w-5" />
         <!-- 通知红点 -->
@@ -277,5 +278,9 @@ const currentPageTitle = computed(() => {
 function logout() {
   authStore.logout()
   router.push('/login')
+}
+
+function openNotifications() {
+  router.push('/logs')
 }
 </script>
