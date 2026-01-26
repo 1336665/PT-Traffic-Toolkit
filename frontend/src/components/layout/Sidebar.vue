@@ -1,99 +1,109 @@
 <template>
-  <aside class="w-20 flex flex-col items-center py-6 bg-white/80 backdrop-blur-xl rounded-3xl m-4 shadow-xl border border-white/50">
-    <!-- 添加按钮 -->
-    <button
-      @click="showAddMenu = !showAddMenu"
-      class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mb-8 hover:scale-110 transition-transform duration-200 shadow-lg shadow-purple-200/50 cursor-pointer relative"
-    >
-      <PlusIcon class="w-6 h-6 text-blue-600" />
-
-      <!-- 添加菜单下拉 -->
-      <transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="transform opacity-0 scale-95"
-        enter-to-class="transform opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="transform opacity-100 scale-100"
-        leave-to-class="transform opacity-0 scale-95"
+  <aside class="w-[88px] flex flex-col items-center py-6 m-4">
+    <div class="bg-white/90 backdrop-blur-xl rounded-[28px] p-4 shadow-xl shadow-slate-200/50 border border-white/60 h-full flex flex-col items-center">
+      <!-- 添加按钮 -->
+      <button
+        @click="showAddMenu = !showAddMenu"
+        class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 via-blue-50 to-purple-100 flex items-center justify-center mb-8 hover:scale-105 transition-all duration-300 shadow-lg shadow-blue-200/60 cursor-pointer relative group"
       >
-        <div
-          v-if="showAddMenu"
-          class="absolute left-full ml-3 top-0 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50"
+        <PlusIcon class="w-7 h-7 text-blue-500 group-hover:rotate-90 transition-transform duration-300" />
+
+        <!-- 添加菜单下拉 -->
+        <transition
+          enter-active-class="transition ease-out duration-200"
+          enter-from-class="transform opacity-0 scale-95 -translate-x-2"
+          enter-to-class="transform opacity-100 scale-100 translate-x-0"
+          leave-active-class="transition ease-in duration-150"
+          leave-from-class="transform opacity-100 scale-100"
+          leave-to-class="transform opacity-0 scale-95"
         >
-          <router-link
-            to="/downloaders"
-            @click="showAddMenu = false"
-            class="flex items-center px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+          <div
+            v-if="showAddMenu"
+            class="absolute left-full ml-4 top-0 w-52 bg-white rounded-2xl shadow-2xl shadow-slate-200/60 border border-slate-100 py-2 z-50"
           >
-            <ServerStackIcon class="w-5 h-5 text-blue-500 mr-3" />
-            添加下载器
-          </router-link>
-          <router-link
-            to="/rss"
-            @click="showAddMenu = false"
-            class="flex items-center px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
-          >
-            <RssIcon class="w-5 h-5 text-orange-500 mr-3" />
-            添加RSS订阅
-          </router-link>
-          <router-link
-            to="/delete-rules"
-            @click="showAddMenu = false"
-            class="flex items-center px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
-          >
-            <TrashIcon class="w-5 h-5 text-red-500 mr-3" />
-            添加删种规则
-          </router-link>
-        </div>
-      </transition>
-    </button>
+            <router-link
+              to="/downloaders"
+              @click="showAddMenu = false"
+              class="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                <ServerStackIcon class="w-4 h-4 text-blue-500" />
+              </div>
+              添加下载器
+            </router-link>
+            <router-link
+              to="/rss"
+              @click="showAddMenu = false"
+              class="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center mr-3">
+                <RssIcon class="w-4 h-4 text-orange-500" />
+              </div>
+              添加RSS订阅
+            </router-link>
+            <router-link
+              to="/delete-rules"
+              @click="showAddMenu = false"
+              class="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center mr-3">
+                <TrashIcon class="w-4 h-4 text-red-500" />
+              </div>
+              添加删种规则
+            </router-link>
+          </div>
+        </transition>
+      </button>
 
-    <!-- 导航菜单 -->
-    <nav class="flex-1 flex flex-col items-center space-y-2">
-      <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        v-slot="{ isExactActive }"
-        custom
-      >
+      <!-- 导航菜单 -->
+      <nav class="flex-1 flex flex-col items-center space-y-3">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          v-slot="{ isExactActive }"
+          custom
+        >
+          <button
+            @click="$router.push(item.path)"
+            class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 cursor-pointer group relative"
+            :class="[
+              isExactActive
+                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/40'
+                : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50'
+            ]"
+            :title="item.label"
+          >
+            <component :is="item.icon" class="w-5 h-5" />
+            <!-- Tooltip -->
+            <span class="absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-xs font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+              {{ item.label }}
+              <span class="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45"></span>
+            </span>
+          </button>
+        </router-link>
+      </nav>
+
+      <!-- 底部设置按钮 -->
+      <router-link to="/settings" v-slot="{ isExactActive }" custom>
         <button
-          @click="$router.push(item.path)"
-          class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer group relative"
+          @click="$router.push('/settings')"
+          class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 cursor-pointer group relative mt-4"
           :class="[
             isExactActive
-              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/40'
+              : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50'
           ]"
-          :title="item.label"
+          title="设置"
         >
-          <component :is="item.icon" class="w-6 h-6" />
-          <!-- Tooltip -->
-          <span class="absolute left-full ml-3 px-3 py-1.5 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
-            {{ item.label }}
+          <Cog6ToothIcon class="w-5 h-5" />
+          <span class="absolute left-full ml-4 px-3 py-2 bg-slate-800 text-white text-xs font-medium rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-lg">
+            系统设置
+            <span class="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45"></span>
           </span>
         </button>
       </router-link>
-    </nav>
-
-    <!-- 底部设置按钮 -->
-    <router-link to="/settings" v-slot="{ isExactActive }" custom>
-      <button
-        @click="$router.push('/settings')"
-        class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer group relative"
-        :class="[
-          isExactActive
-            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-        ]"
-        title="设置"
-      >
-        <Cog6ToothIcon class="w-6 h-6" />
-        <span class="absolute left-full ml-3 px-3 py-1.5 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
-          系统设置
-        </span>
-      </button>
-    </router-link>
+    </div>
   </aside>
 </template>
 

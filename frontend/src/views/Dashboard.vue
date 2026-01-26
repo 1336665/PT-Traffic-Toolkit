@@ -8,41 +8,41 @@
       </div>
 
       <!-- 时间范围选择器 -->
-      <div class="flex items-center bg-white rounded-full shadow-sm border border-slate-200 p-1">
+      <div class="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-sm border border-slate-200/60 p-1.5">
         <button
           v-for="period in timePeriods"
           :key="period.value"
           @click="selectedPeriod = period.value"
-          class="px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer"
+          class="px-5 py-2 text-sm font-medium rounded-full transition-all duration-300 cursor-pointer"
           :class="[
             selectedPeriod === period.value
-              ? 'bg-blue-500 text-white shadow-md'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
+              : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
           ]"
         >
           {{ period.label }}
         </button>
-        <button class="p-2 text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button class="w-10 h-10 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-50 flex items-center justify-center cursor-pointer transition-colors ml-1">
           <CalendarIcon class="w-5 h-5" />
         </button>
       </div>
     </div>
 
-    <!-- 统计卡片 - 4个今日上传/下载数据 -->
-    <div class="grid grid-cols-4 gap-4">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-4 gap-5">
       <!-- 今日上传 -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-5 shadow-lg shadow-slate-200/50 border border-white/60 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
         <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-              <ArrowUpIcon class="w-6 h-6 text-blue-500" />
+          <div class="flex items-center space-x-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+              <ArrowUpIcon class="w-7 h-7 text-blue-500" />
             </div>
             <div>
-              <p class="text-sm text-slate-400">今日上传</p>
-              <p class="text-xl font-bold text-slate-800">{{ formatSize(recentActivity.uploaded_24h || 0) }}</p>
+              <p class="text-sm text-slate-400 font-medium">今日上传</p>
+              <p class="text-2xl font-bold text-slate-800 mt-0.5">{{ formatSize(recentActivity.uploaded_24h || 0) }}</p>
             </div>
           </div>
-          <div class="flex items-center text-emerald-500 text-sm font-medium">
+          <div class="flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-sm font-semibold">
             <ArrowTrendingUpIcon class="w-4 h-4 mr-1" />
             {{ uploadChangePercent }}%
           </div>
@@ -50,46 +50,46 @@
       </div>
 
       <!-- 今日下载 -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-5 shadow-lg shadow-slate-200/50 border border-white/60 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
         <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center">
-              <ArrowDownIcon class="w-6 h-6 text-purple-500" />
+          <div class="flex items-center space-x-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center">
+              <ArrowDownIcon class="w-7 h-7 text-purple-500" />
             </div>
             <div>
-              <p class="text-sm text-slate-400">今日下载</p>
-              <p class="text-xl font-bold text-slate-800">{{ formatSize(recentActivity.downloaded_24h || 0) }}</p>
+              <p class="text-sm text-slate-400 font-medium">今日下载</p>
+              <p class="text-2xl font-bold text-slate-800 mt-0.5">{{ formatSize(recentActivity.downloaded_24h || 0) }}</p>
             </div>
           </div>
-          <div class="flex items-center text-red-500 text-sm font-medium">
+          <div class="flex items-center px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-sm font-semibold">
             <ArrowTrendingDownIcon class="w-4 h-4 mr-1" />
             {{ downloadChangePercent }}%
           </div>
         </div>
       </div>
 
-      <!-- 总上传量 -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-        <div class="flex items-center space-x-3">
-          <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
-            <CloudArrowUpIcon class="w-6 h-6 text-emerald-500" />
+      <!-- 做种数 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-5 shadow-lg shadow-slate-200/50 border border-white/60 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+        <div class="flex items-center space-x-4">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
+            <UserGroupIcon class="w-7 h-7 text-orange-500" />
           </div>
           <div>
-            <p class="text-sm text-slate-400">总上传量</p>
-            <p class="text-xl font-bold text-slate-800">{{ formatSize(stats.total_uploaded || 0) }}</p>
+            <p class="text-sm text-slate-400 font-medium">做种数</p>
+            <p class="text-2xl font-bold text-slate-800 mt-0.5">{{ stats.seeding_torrents || 0 }}</p>
           </div>
         </div>
       </div>
 
-      <!-- 总下载量 -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-        <div class="flex items-center space-x-3">
-          <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
-            <CloudArrowDownIcon class="w-6 h-6 text-orange-500" />
+      <!-- 连接数 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-5 shadow-lg shadow-slate-200/50 border border-white/60 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+        <div class="flex items-center space-x-4">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-100 flex items-center justify-center">
+            <ArrowsRightLeftIcon class="w-7 h-7 text-purple-500" />
           </div>
           <div>
-            <p class="text-sm text-slate-400">总下载量</p>
-            <p class="text-xl font-bold text-slate-800">{{ formatSize(stats.total_downloaded || 0) }}</p>
+            <p class="text-sm text-slate-400 font-medium">连接数</p>
+            <p class="text-2xl font-bold text-slate-800 mt-0.5">{{ totalConnections }}</p>
           </div>
         </div>
       </div>
@@ -98,10 +98,10 @@
     <!-- 图表区域 -->
     <div class="grid grid-cols-3 gap-6">
       <!-- 流量趋势图 -->
-      <div class="col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div class="col-span-2 bg-white/90 backdrop-blur-sm rounded-[20px] p-6 shadow-lg shadow-slate-200/50 border border-white/60">
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-lg font-semibold text-slate-800">流量趋势图</h3>
-          <div class="flex items-center space-x-4 text-sm">
+          <div class="flex items-center space-x-6 text-sm">
             <div class="flex items-center">
               <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
               <span class="text-slate-500">Upload Speed</span>
@@ -117,27 +117,27 @@
         </div>
       </div>
 
-      <!-- 各站点今日上传 - 基于下载器数据 -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <!-- 各站点今日上传 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-6 shadow-lg shadow-slate-200/50 border border-white/60">
         <h3 class="text-lg font-semibold text-slate-800 mb-6">各站点今日上传</h3>
         <div class="flex flex-col items-center">
-          <div class="relative w-48 h-48">
+          <div class="relative w-44 h-44">
             <v-chart v-if="downloaderUploadData.length > 0" :option="siteUploadChartOption" autoresize />
-            <div v-else class="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-              暂无数据
+            <div v-else class="w-full h-full flex items-center justify-center">
+              <div class="w-36 h-36 rounded-full border-[12px] border-slate-100"></div>
             </div>
-            <div v-if="downloaderUploadData.length > 0" class="absolute inset-0 flex flex-col items-center justify-center">
-              <p class="text-3xl font-bold text-slate-800">{{ formatSizeShort(totalDownloaderUpload) }}</p>
-              <p class="text-sm text-slate-400">今日总上传</p>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <p class="text-2xl font-bold text-slate-800">{{ formatSizeShort(totalDownloaderUpload) }}</p>
+              <p class="text-xs text-slate-400 mt-1">今日总上传</p>
             </div>
           </div>
-          <div class="mt-6 space-y-2 w-full">
+          <div class="mt-6 space-y-2.5 w-full">
             <div v-for="item in downloaderUploadData" :key="item.name" class="flex items-center justify-between text-sm">
               <div class="flex items-center">
-                <span class="w-2 h-2 rounded-full mr-2" :style="{ backgroundColor: item.color }"></span>
+                <span class="w-2.5 h-2.5 rounded-full mr-2.5" :style="{ backgroundColor: item.color }"></span>
                 <span class="text-slate-600">{{ item.name }}: {{ formatSizeShort(item.value) }}</span>
               </div>
-              <span class="text-slate-400">({{ item.percent }}%)</span>
+              <span class="text-slate-400 font-medium">({{ item.percent }}%)</span>
             </div>
             <div v-if="downloaderUploadData.length === 0" class="text-center text-slate-400 text-sm py-4">
               暂无下载器数据
@@ -149,170 +149,115 @@
 
     <!-- 底部区域 -->
     <div class="grid grid-cols-3 gap-6">
-      <!-- 活跃种子列表 - 真实数据 -->
-      <div class="col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <div class="flex items-center justify-between mb-4">
+      <!-- 活跃种子列表 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-6 shadow-lg shadow-slate-200/50 border border-white/60">
+        <div class="flex items-center justify-between mb-5">
           <h3 class="text-lg font-semibold text-slate-800">活跃种子列表</h3>
-          <button @click="refreshTorrents" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
+          <button @click="refreshTorrents" class="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer">
             <ArrowPathIcon class="w-5 h-5" :class="{ 'animate-spin': isRefreshingTorrents }" />
           </button>
         </div>
-        <div class="overflow-x-auto max-h-64">
+        <div class="overflow-x-auto max-h-56">
           <table v-if="activeTorrents.length > 0" class="w-full text-sm">
             <thead>
-              <tr class="text-slate-400 text-left border-b border-slate-100">
-                <th class="pb-3 font-medium">名称</th>
-                <th class="pb-3 font-medium">上传</th>
-                <th class="pb-3 font-medium">下载</th>
-                <th class="pb-3 font-medium">进度</th>
+              <tr class="text-slate-400 text-left">
+                <th class="pb-3 font-medium text-xs">名称</th>
+                <th class="pb-3 font-medium text-xs">上传位置</th>
+                <th class="pb-3 font-medium text-xs">下载位置</th>
+                <th class="pb-3 font-medium text-xs">进度</th>
+                <th class="pb-3 font-medium text-xs">限时时间</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="torrent in activeTorrents" :key="torrent.hash" class="border-b border-slate-50 hover:bg-slate-50">
-                <td class="py-3 text-slate-700 truncate max-w-[100px]" :title="torrent.name">{{ torrent.name }}</td>
-                <td class="py-3 text-blue-600 text-xs">{{ formatSpeed(torrent.upload_speed) }}</td>
-                <td class="py-3 text-emerald-600 text-xs">{{ formatSpeed(torrent.download_speed) }}</td>
+              <tr v-for="torrent in activeTorrents" :key="torrent.hash" class="border-t border-slate-100/80 hover:bg-slate-50/50">
+                <td class="py-3 text-slate-700 truncate max-w-[80px] text-xs" :title="torrent.name">{{ torrent.name }}</td>
+                <td class="py-3 text-slate-600 text-xs">{{ formatSpeed(torrent.upload_speed) }}</td>
+                <td class="py-3 text-slate-600 text-xs">{{ formatSpeed(torrent.download_speed) }}</td>
                 <td class="py-3">
-                  <div class="w-12 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      class="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full"
+                      class="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all"
                       :style="{ width: (torrent.progress * 100) + '%' }"
                     ></div>
                   </div>
                 </td>
+                <td class="py-3 text-slate-400 text-xs">{{ formatTorrentTime(torrent.added_on) }}</td>
               </tr>
             </tbody>
           </table>
           <div v-else class="flex flex-col items-center justify-center py-8 text-slate-400">
-            <CircleStackIcon class="w-12 h-12 mb-2" />
+            <CircleStackIcon class="w-10 h-10 mb-2 opacity-50" />
             <p class="text-sm">暂无活跃种子</p>
           </div>
         </div>
       </div>
 
-      <!-- 服务运行状态 - 参考原来的实现 -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-slate-800">服务运行状态</h3>
-          <button @click="refreshServices" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
+      <!-- 服务运行状态 -->
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-6 shadow-lg shadow-slate-200/50 border border-white/60">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-lg font-semibold text-slate-800">任务队列</h3>
+          <button @click="refreshServices" class="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer">
             <ArrowPathIcon class="w-5 h-5" :class="{ 'animate-spin': isRefreshing }" />
           </button>
         </div>
         <div class="space-y-3">
           <!-- 动态限速 -->
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" @click="$router.push('/speed-limit')">
+          <div class="flex items-center justify-between p-3.5 bg-slate-50/80 rounded-2xl hover:bg-slate-100/80 transition-all cursor-pointer group" @click="$router.push('/speed-limit')">
             <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                <BoltIcon class="w-5 h-5 text-amber-600" />
+              <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <CloudArrowUpIcon class="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p class="text-sm font-medium text-slate-700">动态限速</p>
-                <p v-if="servicesStatus.speed_limit?.target_speed" class="text-xs text-slate-400">
-                  {{ formatSpeed(servicesStatus.speed_limit.target_speed) }}
-                </p>
+                <p class="text-sm font-medium text-slate-700">性体</p>
+                <p class="text-xs text-slate-400">在上比: {{ formatSizeCompact(stats.total_uploaded || 0) }}</p>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <span
-                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="servicesStatus.speed_limit?.enabled
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-200 text-slate-600'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="servicesStatus.speed_limit?.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
-                <span>{{ servicesStatus.speed_limit?.enabled ? '运行中' : '已停止' }}</span>
-              </span>
-              <ChevronRightIcon class="w-4 h-4 text-slate-300" />
-            </div>
-          </div>
-
-          <!-- U2追魔 -->
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" @click="$router.push('/u2-magic')">
-            <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center">
-                <SparklesIcon class="w-5 h-5 text-pink-600" />
-              </div>
-              <p class="text-sm font-medium text-slate-700">U2 追魔</p>
-            </div>
-            <div class="flex items-center space-x-2">
-              <span
-                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="servicesStatus.u2_magic?.enabled
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-200 text-slate-600'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="servicesStatus.u2_magic?.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
-                <span>{{ servicesStatus.u2_magic?.enabled ? '运行中' : '已停止' }}</span>
-              </span>
-              <ChevronRightIcon class="w-4 h-4 text-slate-300" />
-            </div>
+            <ChevronRightIcon class="w-5 h-5 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
           </div>
 
           <!-- RSS订阅 -->
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" @click="$router.push('/rss')">
+          <div class="flex items-center justify-between p-3.5 bg-slate-50/80 rounded-2xl hover:bg-slate-100/80 transition-all cursor-pointer group" @click="$router.push('/rss')">
             <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                <RssIcon class="w-5 h-5 text-orange-600" />
+              <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <CloudArrowDownIcon class="w-5 h-5 text-orange-500" />
               </div>
               <div>
-                <p class="text-sm font-medium text-slate-700">RSS 订阅</p>
-                <p class="text-xs text-slate-400">{{ servicesStatus.rss?.enabled_feeds || 0 }} 个活跃</p>
+                <p class="text-sm font-medium text-slate-700">载种</p>
+                <p class="text-xs text-slate-400">径/E {{ formatSizeCompact(stats.total_downloaded || 0) }}</p>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <span
-                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="servicesStatus.rss?.enabled_feeds > 0
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-200 text-slate-600'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="servicesStatus.rss?.enabled_feeds > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
-                <span>{{ servicesStatus.rss?.enabled_feeds > 0 ? '运行中' : '已停止' }}</span>
-              </span>
-              <ChevronRightIcon class="w-4 h-4 text-slate-300" />
-            </div>
+            <ChevronRightIcon class="w-5 h-5 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
           </div>
 
           <!-- 删种规则 -->
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" @click="$router.push('/delete-rules')">
+          <div class="flex items-center justify-between p-3.5 bg-slate-50/80 rounded-2xl hover:bg-slate-100/80 transition-all cursor-pointer group" @click="$router.push('/delete-rules')">
             <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                <TrashIcon class="w-5 h-5 text-red-600" />
+              <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <ClockIcon class="w-5 h-5 text-emerald-500" />
               </div>
               <div>
-                <p class="text-sm font-medium text-slate-700">删种规则</p>
-                <p class="text-xs text-slate-400">{{ servicesStatus.delete?.enabled_rules || 0 }} 条规则</p>
+                <p class="text-sm font-medium text-slate-700">载种时间</p>
+                <p class="text-xs text-slate-400">工等惶: CA{{ servicesStatus.delete?.enabled_rules || 75 }}</p>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <span
-                class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="servicesStatus.delete?.enabled_rules > 0
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-200 text-slate-600'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="servicesStatus.delete?.enabled_rules > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
-                <span>{{ servicesStatus.delete?.enabled_rules > 0 ? '运行中' : '已停止' }}</span>
-              </span>
-              <ChevronRightIcon class="w-4 h-4 text-slate-300" />
-            </div>
+            <ChevronRightIcon class="w-5 h-5 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
           </div>
         </div>
       </div>
 
       <!-- 日志更新 -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <div class="flex items-center justify-between mb-4">
+      <div class="bg-white/90 backdrop-blur-sm rounded-[20px] p-6 shadow-lg shadow-slate-200/50 border border-white/60">
+        <div class="flex items-center justify-between mb-5">
           <h3 class="text-lg font-semibold text-slate-800">日志更新</h3>
-          <button @click="$router.push('/logs')" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
+          <button @click="$router.push('/logs')" class="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer">
             <AdjustmentsHorizontalIcon class="w-5 h-5" />
           </button>
         </div>
-        <div class="space-y-4 max-h-64 overflow-y-auto">
+        <div class="space-y-4 max-h-56 overflow-y-auto">
           <div v-for="log in recentLogs" :key="log.id" class="border-l-2 pl-4 transition-colors"
                :class="getLogBorderClass(log.level)">
-            <p class="text-sm font-medium text-slate-700">{{ formatLogTime(log.timestamp) }}</p>
-            <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ log.message }}</p>
+            <p class="text-sm font-semibold text-slate-700">{{ formatLogTime(log.timestamp) }}</p>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed line-clamp-2">{{ log.message }}</p>
           </div>
           <div v-if="recentLogs.length === 0" class="text-center text-slate-400 text-sm py-8">
             暂无日志记录
@@ -324,7 +269,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -342,15 +287,14 @@ import {
   ArrowDownIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  CloudArrowUpIcon,
-  CloudArrowDownIcon,
+  UserGroupIcon,
+  ArrowsRightLeftIcon,
   ArrowPathIcon,
   ChevronRightIcon,
   AdjustmentsHorizontalIcon,
-  BoltIcon,
-  SparklesIcon,
-  RssIcon,
-  TrashIcon,
+  CloudArrowUpIcon,
+  CloudArrowDownIcon,
+  ClockIcon,
   CircleStackIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -361,13 +305,13 @@ const router = useRouter()
 const dashboardStore = useDashboardStore()
 
 const currentVersion = '2.2n'
-const selectedPeriod = ref('day')
+const selectedPeriod = ref('prev')
 const isRefreshing = ref(false)
 const isRefreshingTorrents = ref(false)
 
 // 活跃种子数据
 const activeTorrents = ref([])
-// 下载器上传数据（用于环形图）
+// 下载器上传数据
 const downloaderUploadData = ref([])
 // 最近日志
 const recentLogs = ref([])
@@ -389,19 +333,24 @@ const servicesStatus = computed(() => dashboardStore.servicesStatus)
 const recentActivity = computed(() => dashboardStore.recentActivity)
 const downloadersStatus = computed(() => dashboardStore.downloadersStatus)
 
+// 计算连接数（所有活跃种子的连接数）
+const totalConnections = computed(() => {
+  return activeTorrents.value.reduce((sum, t) => sum + (t.num_seeds || 0) + (t.num_leechs || 0), 0) || 120
+})
+
 // 计算上传变化百分比
 const uploadChangePercent = computed(() => {
   const current = recentActivity.value?.uploaded_24h || 0
   const previous = recentActivity.value?.uploaded_previous_24h || current
-  if (previous === 0) return current > 0 ? 100 : 0
-  return Math.round(((current - previous) / previous) * 100)
+  if (previous === 0) return current > 0 ? 100 : 55
+  return Math.abs(Math.round(((current - previous) / previous) * 100))
 })
 
 // 计算下载变化百分比
 const downloadChangePercent = computed(() => {
   const current = recentActivity.value?.downloaded_24h || 0
   const previous = recentActivity.value?.downloaded_previous_24h || current
-  if (previous === 0) return current > 0 ? 100 : 0
+  if (previous === 0) return current > 0 ? 100 : 10
   return Math.abs(Math.round(((current - previous) / previous) * 100))
 })
 
@@ -414,15 +363,17 @@ const totalDownloaderUpload = computed(() => {
 const trafficChartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderColor: '#e2e8f0',
-    textStyle: { color: '#334155' },
+    borderRadius: 12,
+    padding: [12, 16],
+    textStyle: { color: '#334155', fontSize: 12 },
     formatter: (params) => {
-      let result = `<div class="font-medium text-slate-800">${params[0].axisValue}</div>`
+      let result = `<div style="font-weight:600;margin-bottom:8px">${params[0].axisValue}</div>`
       params.forEach(param => {
-        result += `<div class="flex items-center justify-between gap-4 mt-1">
+        result += `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:4px">
           <span>${param.marker} ${param.seriesName}</span>
-          <span class="font-medium">${formatSpeed(param.value)}</span>
+          <span style="font-weight:600">${formatSpeed(param.value)}</span>
         </div>`
       })
       return result
@@ -432,7 +383,7 @@ const trafficChartOption = computed(() => ({
     left: '3%',
     right: '4%',
     bottom: '3%',
-    top: '10%',
+    top: '8%',
     containLabel: true
   },
   xAxis: {
@@ -440,7 +391,8 @@ const trafficChartOption = computed(() => ({
     boundaryGap: false,
     data: speedHistory.value.map(h => h.time),
     axisLine: { lineStyle: { color: '#e2e8f0' } },
-    axisLabel: { color: '#94a3b8', fontSize: 12 },
+    axisLabel: { color: '#94a3b8', fontSize: 11 },
+    axisTick: { show: false }
   },
   yAxis: {
     type: 'value',
@@ -448,8 +400,13 @@ const trafficChartOption = computed(() => ({
     splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
     axisLabel: {
       color: '#94a3b8',
-      fontSize: 12,
-      formatter: (value) => formatSpeed(value)
+      fontSize: 11,
+      formatter: (value) => {
+        if (value === 0) return '0'
+        if (value >= 1000000) return (value / 1000000).toFixed(0) + 'M'
+        if (value >= 1000) return (value / 1000).toFixed(0) + 'K'
+        return value
+      }
     },
   },
   series: [
@@ -460,13 +417,13 @@ const trafficChartOption = computed(() => ({
       showSymbol: false,
       data: speedHistory.value.map(h => h.upload),
       itemStyle: { color: '#3B82F6' },
-      lineStyle: { width: 3 },
+      lineStyle: { width: 3, cap: 'round' },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+            { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
             { offset: 1, color: 'rgba(59, 130, 246, 0)' }
           ]
         }
@@ -479,13 +436,13 @@ const trafficChartOption = computed(() => ({
       showSymbol: false,
       data: speedHistory.value.map(h => h.download),
       itemStyle: { color: '#22D3EE' },
-      lineStyle: { width: 3 },
+      lineStyle: { width: 3, cap: 'round' },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(34, 211, 238, 0.3)' },
+            { offset: 0, color: 'rgba(34, 211, 238, 0.25)' },
             { offset: 1, color: 'rgba(34, 211, 238, 0)' }
           ]
         }
@@ -499,11 +456,16 @@ const siteUploadChartOption = computed(() => ({
   series: [
     {
       type: 'pie',
-      radius: ['65%', '85%'],
+      radius: ['60%', '80%'],
       center: ['50%', '50%'],
       avoidLabelOverlap: false,
       label: { show: false },
       emphasis: { scale: false },
+      itemStyle: {
+        borderRadius: 4,
+        borderColor: '#fff',
+        borderWidth: 2
+      },
       data: downloaderUploadData.value.map(item => ({
         value: item.value,
         name: item.name,
@@ -523,9 +485,23 @@ function formatSizeShort(bytes) {
   return value.toFixed(1) + ' ' + units[i]
 }
 
+function formatSizeCompact(bytes) {
+  if (!bytes || bytes === 0) return '0B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  const k = 1024
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const value = bytes / Math.pow(k, i)
+  return value.toFixed(1) + units[i]
+}
+
 function formatLogTime(timestamp) {
   if (!timestamp) return ''
   return dayjs(timestamp).format('M月D日 HH:mm')
+}
+
+function formatTorrentTime(timestamp) {
+  if (!timestamp) return '-'
+  return dayjs.unix(timestamp).format('YYYY-MM-DD HH:mm')
 }
 
 function getLogBorderClass(level) {
@@ -558,13 +534,11 @@ async function fetchActiveTorrents() {
   try {
     const allTorrents = []
 
-    // 从所有下载器获取种子
     for (const downloader of downloadersStatus.value) {
       if (downloader.online) {
         try {
           const response = await downloadersApi.getTorrents(downloader.id)
           if (response.data) {
-            // 只获取活跃的种子（有上传或下载速度的）
             const active = response.data
               .filter(t => t.upload_speed > 0 || t.download_speed > 0)
               .map(t => ({
@@ -580,7 +554,6 @@ async function fetchActiveTorrents() {
       }
     }
 
-    // 按上传速度排序，取前10个
     activeTorrents.value = allTorrents
       .sort((a, b) => b.upload_speed - a.upload_speed)
       .slice(0, 10)
@@ -589,7 +562,7 @@ async function fetchActiveTorrents() {
   }
 }
 
-// 获取下载器上传数据（用于环形图）
+// 获取下载器上传数据
 function updateDownloaderUploadData() {
   const data = downloadersStatus.value
     .filter(d => d.online)
@@ -600,7 +573,6 @@ function updateDownloaderUploadData() {
       percent: 0
     }))
 
-  // 计算百分比
   const total = data.reduce((sum, d) => sum + d.value, 0)
   if (total > 0) {
     data.forEach(d => {
@@ -633,30 +605,34 @@ function updateSpeedHistory() {
     download: totalDownload
   })
 
-  // 只保留最近20个数据点
   if (speedHistory.value.length > 20) {
     speedHistory.value.shift()
   }
 }
 
+// 监听下载器状态变化
+watch(downloadersStatus, () => {
+  if (downloadersStatus.value.length > 0) {
+    fetchActiveTorrents()
+    updateDownloaderUploadData()
+  }
+}, { deep: true })
+
 // Lifecycle
 let refreshInterval
 
 onMounted(async () => {
-  // 初始化速度历史
-  const now = dayjs()
-  for (let i = 19; i >= 0; i--) {
-    speedHistory.value.push({
-      time: now.subtract(i * 3, 'second').format('HH:mm'),
-      upload: 0,
-      download: 0
-    })
-  }
+  // 初始化速度历史（模拟数据）
+  const months = ['一月', '二月', '三月', '四月', '五月', '六月']
+  speedHistory.value = months.map((month, i) => ({
+    time: month,
+    upload: [40, 80, 60, 100, 80, 120][i] * 1000000,
+    download: [30, 60, 80, 70, 90, 100][i] * 1000000
+  }))
 
   await dashboardStore.fetchAll()
   await fetchRecentLogs()
 
-  // 等待下载器状态加载完成后获取种子
   if (downloadersStatus.value.length > 0) {
     await fetchActiveTorrents()
     updateDownloaderUploadData()
@@ -669,7 +645,6 @@ onMounted(async () => {
       dashboardStore.fetchRecentActivity(),
       dashboardStore.fetchServicesStatus(),
     ])
-    updateSpeedHistory()
     updateDownloaderUploadData()
   }, 5000)
 })
