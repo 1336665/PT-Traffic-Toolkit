@@ -18,7 +18,7 @@
       </TransitionChild>
 
       <div class="fixed inset-0 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4 text-center">
+        <div class="flex min-h-full items-end sm:items-center justify-center p-2 sm:p-4 text-center">
           <TransitionChild
             as="template"
             enter="ease-out duration-400"
@@ -29,14 +29,14 @@
             leave-to="opacity-0 scale-90 translate-y-8"
           >
             <DialogPanel
-              class="relative w-full transform text-left align-middle transition-all flex flex-col max-h-[90vh] group"
+              class="relative w-full transform text-left align-middle transition-all flex flex-col max-h-[85vh] sm:max-h-[90vh] group"
               :class="[sizeClass]"
             >
               <!-- Animated glow border -->
               <div v-if="glow" class="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-primary-500 via-purple-500 to-cyan-500 opacity-40 blur-sm animate-glow-pulse -z-10"></div>
 
               <!-- Main modal container -->
-              <div class="relative rounded-2xl overflow-hidden"
+              <div class="relative rounded-2xl overflow-hidden flex flex-col min-h-0"
                    :class="[
                      glass
                        ? 'bg-white/80 dark:bg-surface-800/80 backdrop-blur-2xl backdrop-saturate-150'
@@ -81,7 +81,7 @@
                 </div>
 
                 <!-- Body -->
-                <div class="relative flex-1 px-6 py-5 overflow-y-auto">
+                <div class="relative flex-1 px-6 py-5 overflow-y-auto overscroll-contain" style="-webkit-overflow-scrolling: touch;">
                   <slot />
                 </div>
 
