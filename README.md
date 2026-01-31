@@ -124,7 +124,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/1336665/PT-Manager-Pro.git
+git clone https://github.com/1336665/PT-Traffic-Toolkit.git
 cd PT-Manager-Pro
 
 # 复制环境配置
