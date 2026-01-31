@@ -1,0 +1,49 @@
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# HTTP client
+httpx==0.27.0
+aiohttp==3.9.1
+
+# Scheduler
+apscheduler==3.10.4
+
+# Torrent clients
+qbittorrent-api>=2023.11.57
+transmission-rpc==7.0.3
+deluge-client==1.10.2
+
+# RSS parsing
+feedparser==6.0.10
+js2py==0.74
+
+# HTML parsing
+beautifulsoup4==4.12.3
+lxml==5.1.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+numpy==1.26.3
+
+# SSH for Netcup monitoring
+paramiko==3.4.0
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.3
+
+# Telegram notifications (optional, remove httpx conflict)
+# Use httpx directly for telegram API calls instead of python-telegram-bot
