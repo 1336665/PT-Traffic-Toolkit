@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(dir /s /b \"e:\\\\u2\\\\PT-Traffic-Toolkit-fixed-v6\\\\PT-Traffic-Toolkit-clean\")",
+      "WebFetch(domain:guyuan.de)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(docker pull:*)",
+      "Bash(docker create:*)",
+      "Bash(docker cp:*)",
+      "Bash(tar:*)",
+      "Bash(docker rm:*)",
+      "Bash(dir:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(Select-String -Pattern \"netcup|Server.*status|keys=\")",
+      "Bash(docker compose build:*)",
+      "Bash(docker compose up:*)",
+      "Bash(du:*)",
+      "Bash(gh auth:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
