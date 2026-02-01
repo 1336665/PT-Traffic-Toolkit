@@ -752,6 +752,7 @@ class TorrentState:
     waiting_reannounce: bool = False
     next_announce_time: Optional[float] = None
     announce_interval: Optional[int] = None
+    min_announce: Optional[int] = None  # tracker min announce（秒），用于持久化/调试
     # next_announce 是否可靠（用于处理部分 libtorrent/qB 显示异常）
     next_announce_is_true: bool = False
     # next_announce 观测（用于检测跳变/异常）
@@ -1128,7 +1129,7 @@ class TorrentState:
             waiting_reannounce=data.get('waiting_reannounce', False),
             next_announce_time=data.get('next_announce_time'),
             announce_interval=data.get('announce_interval'),
-            min_announce=data.get('min_announce', 0.0),
+            min_announce=(int(data.get('min_announce')) if data.get('min_announce') is not None else None),
             next_announce_is_true=data.get('next_announce_is_true', False),
             last_next_remaining=data.get('last_next_remaining'),
             last_next_update_time=data.get('last_next_update_time', 0.0),
