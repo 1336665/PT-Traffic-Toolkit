@@ -281,16 +281,21 @@ def estimate_announce_interval(time_ref: float, min_interval: int = 300, seeding
     """
     # 计算种子年龄
     # 优先级: 发布时间 > 做种时间 > 添加时间
+    now_ts = time.time()
     if is_publish_time and time_ref > 0:
-        # 发布时间是最准确的，直接计算年龄
-        age = time.time() - time_ref
-    elif seeding_time > 0:
+        # 发布时间应当是过去时间；如果解析到未来（常见原因：抓到了促销结束时间或时区错误），直接忽略并走兜底
+        if time_ref > now_ts + 60:
+            is_publish_time = False
+        else:
+            # 发布时间是最准确的，直接计算年龄
+            age = now_ts - time_ref
+    if (not is_publish_time) and seeding_time > 0:
         # 做种时间可以作为种子年龄的下限估计
         # 如果做种时间很长，说明种子至少这么老
         age = seeding_time
     else:
         # 添加时间作为兜底
-        age = time.time() - time_ref
+        age = now_ts - time_ref
 
     if age < 7 * 86400:  # 7天内
         return max(C.ANNOUNCE_INTERVAL_NEW, min_interval)  # 1800
@@ -1835,31 +1840,47 @@ class SpeedLimiterService:
                     _tid_cache[torrent.hash] = tid
                     break
 
-            # 提取发布时间：优先取结果行第 4 列的 <time>（与 u2_magic.py 的 contents[3].time 对齐）
-            time_tag = None
+            # 提取发布时间：
+            # 1) 尝试第 4 列（u2_magic.py 使用 contents[3].time）
+            # 2) 如果失败，则在该行所有 <time> 中选择“最早且不在未来”的时间（避免误取促销结束时间）
+            candidates: list[tuple[float, str]] = []
             if result_row is not None:
                 tds = result_row.find_all("td")
                 if len(tds) >= 4:
-                    time_tag = tds[3].find("time")
-                if not time_tag:
-                    time_tag = result_row.find("time")
-            if not time_tag:
-                # 兜底：表格里第一个 time（旧逻辑）
-                time_tag = torrents_table.find("time")
+                    tt = tds[3].find("time")
+                    if tt:
+                        ds = (tt.get("title") or tt.get_text(" ", strip=True) or "").strip()
+                        ts = self._parse_u2_time_to_timestamp(ds, page_tz) if ds else None
+                        if ts:
+                            candidates.append((ts, ds))
 
-            if time_tag:
-                date_str = (time_tag.get("title") or time_tag.get_text(" ", strip=True) or "").strip()
-                if date_str:
-                    publish_time = self._parse_u2_time_to_timestamp(date_str, page_tz)
-                    if publish_time:
-                        _publish_time_cache[torrent.hash] = publish_time
-                        logger.debug(f"[{torrent.name[:20]}] 获取到发布时间: {date_str} ({publish_time})")
-                    else:
-                        logger.debug(f"[{torrent.name[:20]}] 无法解析发布时间: {date_str}")
+                # 收集该行所有 time
+                for tt in result_row.find_all("time"):
+                    ds = (tt.get("title") or tt.get_text(" ", strip=True) or "").strip()
+                    ts = self._parse_u2_time_to_timestamp(ds, page_tz) if ds else None
+                    if ts:
+                        candidates.append((ts, ds))
 
-            if tid or publish_time:
-                return tid, publish_time
+            # 兜底：表格里所有 time
+            if not candidates:
+                for tt in torrents_table.find_all("time"):
+                    ds = (tt.get("title") or tt.get_text(" ", strip=True) or "").strip()
+                    ts = self._parse_u2_time_to_timestamp(ds, page_tz) if ds else None
+                    if ts:
+                        candidates.append((ts, ds))
 
+            if candidates:
+                now_ts = time.time()
+                past = [(ts, ds) for ts, ds in candidates if ts <= now_ts + 60]
+                if past:
+                    # 选择最早的过去时间作为发布时间（更稳：避免取到“最近活动时间”等）
+                    publish_time, date_str = min(past, key=lambda x: x[0])
+                    _publish_time_cache[torrent.hash] = publish_time
+                    logger.debug(f"[{torrent.name[:20]}] 获取到发布时间: {date_str} ({publish_time})")
+                    return tid, publish_time
+                else:
+                    # 全部在未来，说明抓取到了错误的 time（通常是促销结束时间）或时区异常
+                    logger.debug(f"[{torrent.name[:20]}] 时间候选均在未来，忽略发布时间候选: {[d for _, d in candidates][:3]}")
             logger.debug(f"[{torrent.name[:20]}] hash搜索未找到TID")
             return None, None
 
@@ -3108,7 +3129,7 @@ class SpeedLimiterService:
 
         # 计算种子年龄（用于调试）
         publish_time_val = _publish_time_cache.get(torrent.hash) or (state.publish_time if state else None)
-        if publish_time_val and publish_time_val > 0:
+        if publish_time_val and publish_time_val > 0 and publish_time_val <= now + 60:
             torrent_age = now - publish_time_val
             age_source = "publish"
         elif torrent.seeding_time and torrent.seeding_time > 0:
