@@ -228,6 +228,13 @@ class C:
     LIMIT_START_PREDICTION = 1.02      # 当预测上传量超过目标102%时就限速（更敏感）
     NO_LIMIT_HEADROOM = 0.2            # 只有还有20%以上的配额余量时才可能不限速
 
+    # 动态限速触发（参考 u2_magic.py：接近超标才开始限速，避免过早）
+    LIMIT_TRIGGER_BUFFER_SEC = 10.0   # 反应/调度缓冲（秒），≈ res = 10 * speed
+    LIMIT_TRIGGER_FLOOR_RATIO = 0.12  # 进入限速后的保守“底速”比例（≈6MiB/50MiB）
+    LIMIT_TRIGGER_FLOOR_RATIO_MIN = 0.05
+    LIMIT_TRIGGER_FLOOR_RATIO_MAX = 0.20
+
+
     # 动态循环间隔配置（秒）
     # 参考 Speed-Limiting-Engine.py: 根据最小剩余时间智能调整检查频率
     DYNAMIC_INTERVAL = {
@@ -1065,10 +1072,12 @@ class TorrentState:
             'cycle_start_time': self.cycle_start_time,
             'last_announce_time': self.last_announce_time,
             'last_reannounce': self.last_reannounce,
+            'last_force_reannounce': self.last_force_reannounce,
             'reannounced_this_cycle': self.reannounced_this_cycle,
             'waiting_reannounce': self.waiting_reannounce,
             'next_announce_time': self.next_announce_time,
             'announce_interval': self.announce_interval,
+            'min_announce': self.min_announce,
             'next_announce_is_true': self.next_announce_is_true,
             'last_next_remaining': self.last_next_remaining,
             'last_next_update_time': self.last_next_update_time,
@@ -1114,10 +1123,12 @@ class TorrentState:
             cycle_start_time=data.get('cycle_start_time', 0),
             last_announce_time=data.get('last_announce_time'),
             last_reannounce=data.get('last_reannounce', 0),
+            last_force_reannounce=data.get('last_force_reannounce', 0.0),
             reannounced_this_cycle=data.get('reannounced_this_cycle', False),
             waiting_reannounce=data.get('waiting_reannounce', False),
             next_announce_time=data.get('next_announce_time'),
             announce_interval=data.get('announce_interval'),
+            min_announce=data.get('min_announce', 0.0),
             next_announce_is_true=data.get('next_announce_is_true', False),
             last_next_remaining=data.get('last_next_remaining'),
             last_next_update_time=data.get('last_next_update_time', 0.0),
@@ -1630,6 +1641,62 @@ class SpeedLimiterService:
             return None
         return None
 
+    def _parse_u2_time_to_timestamp(self, date_str: str, tz_name: Optional[str]) -> Optional[float]:
+        """解析 U2 页面上的时间字符串为时间戳。
+
+        U2 的 <time> 标签通常在 title 属性里给出完整时间，例如:
+        - 2025-01-31 12:34:56
+        - 2025-01-31 12:34
+
+        此处做宽松解析并可选绑定时区（来自 _extract_timezone_from_u2_page）。
+        """
+        try:
+            s = (date_str or "").strip()
+            if not s:
+                return None
+
+            # 压缩空白
+            s = re.sub(r"\s+", " ", s)
+
+            # 常见格式
+            fmts = [
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M",
+                "%Y-%m-%d",
+                "%Y/%m/%d %H:%M:%S",
+                "%Y/%m/%d %H:%M",
+                "%Y/%m/%d",
+            ]
+
+            publish_dt: Optional[datetime] = None
+            for fmt in fmts:
+                try:
+                    publish_dt = datetime.strptime(s, fmt)
+                    break
+                except ValueError:
+                    continue
+
+            if publish_dt is None:
+                # 尝试 ISO 解析（兼容 "YYYY-MM-DDTHH:MM:SS" 等）
+                try:
+                    publish_dt = datetime.fromisoformat(s)
+                except Exception:
+                    publish_dt = None
+
+            if publish_dt is None:
+                return None
+
+            if tz_name and ZoneInfo is not None and publish_dt.tzinfo is None:
+                try:
+                    publish_dt = publish_dt.replace(tzinfo=ZoneInfo(tz_name))
+                except Exception:
+                    # 时区无效则忽略，按本地/naive 处理
+                    pass
+
+            return float(publish_dt.timestamp())
+        except Exception:
+            return None
+
     def _is_u2_site(self, site_rule: Optional[SpeedLimitSite], tracker_domain: str) -> bool:
         """判断站点规则是否属于 U2（用于启用脚本风格的 30/45/60 分钟间隔）。"""
         if not site_rule:
@@ -1747,65 +1814,49 @@ class SpeedLimiterService:
                 return None, None
 
             # 在种子表格中查找 details.php 链接和发布时间
-            # 因为是按hash搜索，应该只有一个结果
+            # 因为是按 hash 搜索，通常只有一个结果，但仍按“包含 details.php?id= 的行”定位更稳健
             global _tid_cache, _publish_time_cache
-            tid = None
-            publish_time = None
+            tid: Optional[str] = None
+            publish_time: Optional[float] = None
 
-            # 查找TID
-            for link in torrents_table.find_all("a", href=True):
-                href = link.get("href", "")
-                if "details.php?id=" in href:
-                    match = re.search(r'id=(\d+)', href)
-                    if match:
-                        tid = match.group(1)
-                        logger.debug(f"[{torrent.name[:20]}] 通过hash搜索获取到TID: {tid}")
-                        # 缓存TID到模块级缓存（永久有效）
-                        _tid_cache[torrent.hash] = tid
-                        break
+            # 先在每一行里找 details 链接，锁定对应行（参考 u2_magic.py 的 table[0].contents[1]）
+            result_row = None
+            for row in torrents_table.find_all("tr"):
+                detail_link = row.find("a", href=re.compile(r"details\.php\?id=\d+"))
+                if not detail_link:
+                    continue
+                href = detail_link.get("href", "")
+                match = re.search(r"id=(\d+)", href)
+                if match:
+                    tid = match.group(1)
+                    result_row = row
+                    logger.debug(f"[{torrent.name[:20]}] 通过hash搜索获取到TID: {tid}")
+                    _tid_cache[torrent.hash] = tid
+                    break
 
-            # 查找发布时间 - 参考u2_magic.py: date = table[0].contents[1].contents[3].time
-            # NexusPHP格式：<time>标签包含发布时间
-            time_tag = torrents_table.find("time")
+            # 提取发布时间：优先取结果行第 4 列的 <time>（与 u2_magic.py 的 contents[3].time 对齐）
+            time_tag = None
+            if result_row is not None:
+                tds = result_row.find_all("td")
+                if len(tds) >= 4:
+                    time_tag = tds[3].find("time")
+                if not time_tag:
+                    time_tag = result_row.find("time")
+            if not time_tag:
+                # 兜底：表格里第一个 time（旧逻辑）
+                time_tag = torrents_table.find("time")
+
             if time_tag:
-                # 优先使用title属性（更精确），否则使用文本内容
-                date_str = time_tag.get("title") or time_tag.get_text(strip=True)
+                date_str = (time_tag.get("title") or time_tag.get_text(" ", strip=True) or "").strip()
                 if date_str:
-                    try:
-                        # 尝试解析日期格式：YYYY-MM-DD HH:MM:SS
-                        from datetime import datetime as dt
-                        publish_dt = dt.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-
-                        # 按页面时区解释时间（与 u2_magic.py 一致）
-                        if page_tz and ZoneInfo is not None:
-                            try:
-                                publish_dt = publish_dt.replace(tzinfo=ZoneInfo(page_tz))
-                            except Exception:
-                                # tz 解析失败：回退到本地时区解释
-                                pass
-
-                        publish_time = publish_dt.timestamp()
-                        # 缓存发布时间
+                    publish_time = self._parse_u2_time_to_timestamp(date_str, page_tz)
+                    if publish_time:
                         _publish_time_cache[torrent.hash] = publish_time
                         logger.debug(f"[{torrent.name[:20]}] 获取到发布时间: {date_str} ({publish_time})")
-                    except ValueError:
-                        # 尝试其他日期格式
-                        try:
-                            publish_dt = dt.strptime(date_str, '%Y-%m-%d')
+                    else:
+                        logger.debug(f"[{torrent.name[:20]}] 无法解析发布时间: {date_str}")
 
-                            if page_tz and ZoneInfo is not None:
-                                try:
-                                    publish_dt = publish_dt.replace(tzinfo=ZoneInfo(page_tz))
-                                except Exception:
-                                    pass
-
-                            publish_time = publish_dt.timestamp()
-                            _publish_time_cache[torrent.hash] = publish_time
-                            logger.debug(f"[{torrent.name[:20]}] 获取到发布时间(仅日期): {date_str}")
-                        except ValueError:
-                            logger.debug(f"[{torrent.name[:20]}] 无法解析发布时间: {date_str}")
-
-            if tid:
+            if tid or publish_time:
                 return tid, publish_time
 
             logger.debug(f"[{torrent.name[:20]}] hash搜索未找到TID")
@@ -2034,15 +2085,33 @@ class SpeedLimiterService:
         uploaded = max(0.0, state.total_uploaded - state.cycle_start_uploaded)
         progress = uploaded / target_total if target_total > 0 else 0.0
 
-        # 6) 预测是否会超标
+        # 6) 预测/触发（避免过早限速）
+        #    predicted_* 用于阶段/完结修正；触发条件采用“预算式”判断（参考 u2_magic.py），
+        #    只在接近超标时才开始限速，避免刚开周期就把速度压下去。
         predicted_total = uploaded + state.kalman.predict_upload(time_left)
         predicted_ratio = predicted_total / target_total if target_total > 0 else 1.0
 
-        if predicted_total <= target_total * 1.02 and progress < 0.95:
+        # 预算式触发：允许前期短时高速，只有当“再放开一小段时间 + 后续保持低速”会超标时，才进入限速
+        buffer_seconds = getattr(C, "LIMIT_TRIGGER_BUFFER_SEC", 10.0)
+        floor_ratio = getattr(C, "LIMIT_TRIGGER_FLOOR_RATIO", 0.12)
+        floor_ratio = max(getattr(C, "LIMIT_TRIGGER_FLOOR_RATIO_MIN", 0.05),
+                          min(floor_ratio, getattr(C, "LIMIT_TRIGGER_FLOOR_RATIO_MAX", 0.20)))
+        floor_speed = max(0.0, adjusted_target * floor_ratio)
+
+        # 对下载中任务：完成可能触发汇报（脚本里有 ETA+10s 的余量），这里保持一致
+        effective_tl = time_left
+        if is_downloading and eta_seconds is not None and eta_seconds > 0:
+            effective_tl = min(time_left, float(eta_seconds) + 10.0)
+
+        buffer_speed = max(float(current_speed), float(tracked_speed))
+        soft_predicted_total = uploaded + buffer_speed * buffer_seconds + floor_speed * max(0.0, effective_tl)
+
+        # 还没接近超标：不必提前限速
+        if soft_predicted_total <= target_total and progress < 1.0:
             state.phase = C.PHASE_IDLE
             return 0
 
-        needs_limiting = (predicted_total > target_total * 1.02) or (progress > 1.0)
+        needs_limiting = (soft_predicted_total > target_total) or (progress >= 1.0)
 
         phase = get_phase(time_left, state.cycle_synced, needs_limiting)
         state.phase = phase
@@ -2812,7 +2881,7 @@ class SpeedLimiterService:
         # 优先使用 torrent.next_announce_time（由 get_torrents 批量获取）
         if torrent.next_announce_time and torrent.next_announce_time > now:
             reannounce_seconds = int(torrent.next_announce_time - now)
-            fetch_source = "batch_properties"
+            fetch_source = "torrent_info"
 
         # 获取已保存的状态
         state = self.states.get(torrent.hash)
@@ -2901,6 +2970,50 @@ class SpeedLimiterService:
             torrent.added_time,
             now,
         )
+        # next_announce 倒计时在部分客户端版本会出现“跳变/乱跳”，导致前端显示不准
+        # 这里做一次轻量的跳变检测：若连续检测到异常跳变，则优先使用上一轮倒计时推算的值，保证倒计时单调
+        if state and reannounce_seconds is not None and cycle_interval and reannounce_seconds > 0:
+            try:
+                observed_next = float(reannounce_seconds)
+
+                if state.last_next_remaining is not None and state.last_next_update_time > 0:
+                    dt_obs = now - float(state.last_next_update_time)
+                    expected_raw = float(state.last_next_remaining) - dt_obs
+                    expected = expected_raw
+                    if expected < 0 and cycle_interval > 0:
+                        expected = expected % float(cycle_interval)
+
+                    # 正常的周期重置：上次已接近 0，这次回到接近 interval
+                    is_cycle_reset = (expected_raw <= 0) and (observed_next > float(cycle_interval) * 0.7)
+
+                    if is_cycle_reset:
+                        state.next_jump_suspect_count = 0
+                    else:
+                        diff = observed_next - expected
+                        forced_like = abs(abs(diff) - 900.0) < 10.0  # 常见“强制汇报”跳变 ~15min
+                        jump_threshold = max(120.0, float(cycle_interval) * 0.15)
+
+                        recent_ra = (now - float(getattr(state, "last_reannounce", 0.0)) < 120.0) or \
+                                    (now - float(getattr(state, "last_force_reannounce", 0.0)) < 120.0)
+
+                        if (not forced_like) and (abs(diff) > jump_threshold) and (not recent_ra):
+                            state.next_jump_suspect_count += 1
+                        else:
+                            state.next_jump_suspect_count = max(0, state.next_jump_suspect_count - 1)
+
+                        # 连续两次异常跳变：采用 expected 替代 observed，避免前端倒计时乱跳
+                        if state.next_jump_suspect_count >= 2 and not recent_ra:
+                            observed_next = max(0.0, min(float(cycle_interval), expected))
+                            reannounce_seconds = int(observed_next)
+                            fetch_source = "state_calc"
+
+                # 更新观测值（用于下一次推算）
+                if reannounce_seconds is not None and reannounce_seconds > 0:
+                    state.last_next_remaining = float(reannounce_seconds)
+                    state.last_next_update_time = float(now)
+            except Exception:
+                pass
+
 
         # 这里不再重复覆盖 cycle_interval；上面已处理 custom/u2/默认逻辑
 
