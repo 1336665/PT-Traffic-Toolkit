@@ -2257,11 +2257,32 @@ class SpeedLimiterService:
                             limit_download = False
                             optimize_announce = False
 
-                        if target_speed <= 0:
-                            continue
-
-                        # 获取或创建状态
+                        # 获取或创建状态（在 target_speed 检查前，确保统计数据始终被记录）
                         state = self._get_or_create_state(torrent, tracker)
+
+                        # 即使不限速也记录上传/下载增量统计
+                        if target_speed <= 0:
+                            if state.last_record_uploaded == 0 and torrent.uploaded > 0:
+                                state.last_record_uploaded = torrent.uploaded
+                            if state.last_record_downloaded == 0 and torrent.downloaded > 0:
+                                state.last_record_downloaded = torrent.downloaded
+                            delta_up = max(0, torrent.uploaded - state.last_record_uploaded)
+                            delta_dl = max(0, torrent.downloaded - state.last_record_downloaded)
+                            state.last_record_uploaded = torrent.uploaded
+                            state.last_record_downloaded = torrent.downloaded
+                            if delta_up > 0 or delta_dl > 0:
+                                record = SpeedLimitRecord(
+                                    tracker_domain=tracker,
+                                    downloader_id=downloader.id,
+                                    current_speed=torrent.upload_speed,
+                                    target_speed=0,
+                                    limit_applied=0,
+                                    phase="disabled",
+                                    uploaded=delta_up,
+                                    downloaded=delta_dl,
+                                )
+                                self.db.add(record)
+                            continue
 
                         # 更新下载相关状态（用于下载限速和汇报优化）
                         state.total_done = getattr(torrent, 'completed', 0) or torrent.downloaded
