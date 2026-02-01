@@ -111,9 +111,9 @@ onMounted(() => {
 }
 
 @keyframes number-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 1; }
 }
 
 .number-pop {

@@ -55,11 +55,11 @@ watch(
 )
 
 function onBeforeEnter(el) {
-  el.style.willChange = 'opacity, transform'
+  // Intentionally empty - avoid setting willChange to prevent GPU layer blur
 }
 
 function onAfterLeave(el) {
-  el.style.willChange = ''
+  // Intentionally empty
 }
 </script>
 
@@ -119,12 +119,12 @@ function onAfterLeave(el) {
 
 .page-scale-enter-from {
   opacity: 0;
-  transform: scale(0.95);
+  transform: translateY(8px);
 }
 
 .page-scale-leave-to {
   opacity: 0;
-  transform: scale(1.02);
+  transform: translateY(-8px);
 }
 
 /* Page container for smooth transitions */

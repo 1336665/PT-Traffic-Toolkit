@@ -46,8 +46,8 @@
           <!-- 通知数量徽章 -->
           <transition
             enter-active-class="transition-all duration-300"
-            enter-from-class="scale-0 opacity-0"
-            enter-to-class="scale-100 opacity-100"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
           >
             <span
               v-if="totalUnread > 0"
@@ -62,11 +62,11 @@
         <!-- 通知面板 -->
         <transition
           enter-active-class="transition ease-out duration-200"
-          enter-from-class="transform opacity-0 scale-95 -translate-y-2"
-          enter-to-class="transform opacity-100 scale-100 translate-y-0"
+          enter-from-class="transform opacity-0 -translate-y-2"
+          enter-to-class="transform opacity-100 translate-y-0"
           leave-active-class="transition ease-in duration-150"
-          leave-from-class="transform opacity-100 scale-100 translate-y-0"
-          leave-to-class="transform opacity-0 scale-95 -translate-y-2"
+          leave-from-class="transform opacity-100 translate-y-0"
+          leave-to-class="transform opacity-0 -translate-y-2"
         >
           <div
             v-if="notificationOpen"
@@ -246,11 +246,11 @@
 
         <transition
           enter-active-class="transition ease-out duration-200"
-          enter-from-class="transform opacity-0 scale-95 -translate-y-2"
-          enter-to-class="transform opacity-100 scale-100 translate-y-0"
+          enter-from-class="transform opacity-0 -translate-y-2"
+          enter-to-class="transform opacity-100 translate-y-0"
           leave-active-class="transition ease-in duration-150"
-          leave-from-class="transform opacity-100 scale-100 translate-y-0"
-          leave-to-class="transform opacity-0 scale-95 -translate-y-2"
+          leave-from-class="transform opacity-100 translate-y-0"
+          leave-to-class="transform opacity-0 -translate-y-2"
         >
           <MenuItems class="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-surface-800 rounded-2xl shadow-xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/50 dark:ring-surface-700/50 focus:outline-none z-50 p-1.5 overflow-hidden">
             <div class="px-3 py-2.5 border-b border-surface-100 dark:border-surface-700 mb-1.5">
@@ -323,11 +323,11 @@
         <TransitionChild
           as="template"
           enter="duration-200 ease-out"
-          enter-from="opacity-0 scale-95 -translate-y-4"
-          enter-to="opacity-100 scale-100 translate-y-0"
+          enter-from="opacity-0 -translate-y-4"
+          enter-to="opacity-100 translate-y-0"
           leave="duration-150 ease-in"
-          leave-from="opacity-100 scale-100 translate-y-0"
-          leave-to="opacity-0 scale-95 -translate-y-4"
+          leave-from="opacity-100 translate-y-0"
+          leave-to="opacity-0 -translate-y-4"
         >
           <DialogPanel class="mx-auto max-w-xl transform overflow-hidden rounded-2xl bg-white dark:bg-surface-800 shadow-2xl ring-1 ring-surface-200/50 dark:ring-surface-700/50 transition-all">
             <!-- 搜索输入 -->
@@ -534,11 +534,11 @@
           <TransitionChild
             as="template"
             enter="duration-300 ease-out"
-            enter-from="opacity-0 scale-95"
-            enter-to="opacity-100 scale-100"
+            enter-from="opacity-0 translate-y-4"
+            enter-to="opacity-100 translate-y-0"
             leave="duration-200 ease-in"
-            leave-from="opacity-100 scale-100"
-            leave-to="opacity-0 scale-95"
+            leave-from="opacity-100 translate-y-0"
+            leave-to="opacity-0 translate-y-4"
           >
             <DialogPanel class="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white dark:bg-surface-800 p-6 text-left align-middle shadow-2xl transition-all">
               <div class="flex items-center justify-center w-14 h-14 mx-auto rounded-2xl bg-red-100 dark:bg-red-900/30 mb-4">
