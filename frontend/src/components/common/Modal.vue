@@ -22,11 +22,11 @@
           <TransitionChild
             as="template"
             enter="ease-out duration-400"
-            enter-from="opacity-0 scale-90 translate-y-8"
-            enter-to="opacity-100 scale-100 translate-y-0"
+            enter-from="opacity-0 translate-y-8"
+            enter-to="opacity-100 translate-y-0"
             leave="ease-in duration-300"
-            leave-from="opacity-100 scale-100 translate-y-0"
-            leave-to="opacity-0 scale-90 translate-y-8"
+            leave-from="opacity-100 translate-y-0"
+            leave-to="opacity-0 translate-y-8"
           >
             <DialogPanel
               class="relative w-full transform text-left align-middle transition-all flex flex-col max-h-[85vh] sm:max-h-[90vh] group"
@@ -57,7 +57,7 @@
                 <!-- Header -->
                 <div class="relative flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-surface-200/80 dark:border-surface-700/50">
                   <div class="flex items-center space-x-3">
-                    <div v-if="icon" class="p-2.5 rounded-xl transition-all duration-300 group-hover:scale-110" :class="iconBgClass">
+                    <div v-if="icon" class="p-2.5 rounded-xl transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-0.5" :class="iconBgClass">
                       <component :is="icon" class="w-5 h-5 transition-transform duration-300" :class="iconColorClass" />
                     </div>
                     <div>
@@ -74,7 +74,7 @@
                   </div>
                   <button
                     @click="close"
-                    class="p-2 rounded-xl text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all duration-200 hover:rotate-90 hover:scale-110"
+                    class="p-2 rounded-xl text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all duration-200 hover:rotate-90"
                   >
                     <XMarkIcon class="h-5 w-5" />
                   </button>

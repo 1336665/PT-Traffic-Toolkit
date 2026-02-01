@@ -20,7 +20,7 @@
       >
         <div class="relative group">
           <div class="absolute inset-0 rounded-xl bg-gradient-to-r from-primary-500 to-purple-500 blur-lg opacity-50 group-hover:opacity-70 transition-opacity"></div>
-          <div class="relative w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/40 overflow-hidden transform group-hover:scale-105 transition-transform"
+          <div class="relative w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/40 overflow-hidden transition-shadow group-hover:shadow-xl"
                style="background: var(--gradient-primary)">
             <span class="text-white font-bold text-lg">PT</span>
           </div>
@@ -70,7 +70,7 @@
                 style="background: var(--gradient-primary)"
               ></div>
               <div
-                class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 group-hover:scale-105"
+                class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 group-hover:shadow-md"
                 :class="[
                   isExactActive
                     ? 'text-white shadow-lg shadow-primary-500/40'
@@ -174,7 +174,7 @@
                 style="background: var(--gradient-primary)"
               ></div>
               <div
-                class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 group-hover:scale-105"
+                class="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 group-hover:shadow-md"
                 :class="[
                   isExactActive
                     ? 'text-white shadow-lg shadow-primary-500/40'
@@ -207,11 +207,11 @@
       <!-- 系统状态卡片 -->
       <transition
         enter-active-class="transition-all duration-300"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
+        enter-from-class="opacity-0 translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
         leave-active-class="transition-all duration-200"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-2"
       >
         <div
           v-if="!settingsStore.sidebarCollapsed"
@@ -344,8 +344,8 @@ const systemNavItems = [
 }
 
 @keyframes nav-icon-bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 /* Stagger animation for nav items */

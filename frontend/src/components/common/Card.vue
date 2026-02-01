@@ -24,7 +24,7 @@
       <slot name="header">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-3">
-            <div v-if="icon" class="p-2.5 rounded-xl transition-all duration-300 group-hover/card:scale-110 group-hover/card:shadow-lg" :class="iconBgClass">
+            <div v-if="icon" class="p-2.5 rounded-xl transition-all duration-300 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5" :class="iconBgClass">
               <component :is="icon" class="w-5 h-5 transition-transform duration-300" :class="iconColorClass" />
             </div>
             <div>
