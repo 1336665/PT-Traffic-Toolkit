@@ -553,6 +553,7 @@ import 'dayjs/locale/zh-cn'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useSettingsStore } from '@/stores/settings'
 import { formatSpeed, formatSize, formatRelativeTime } from '@/utils/format'
+import { useRealtime } from '@/services/realtime'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import {
@@ -638,6 +639,7 @@ dayjs.locale('zh-cn')
 
 const dashboardStore = useDashboardStore()
 const settingsStore = useSettingsStore()
+const realtime = useRealtime()
 
 const speedChartPeriod = ref('1h')
 const speedHistory = ref([])
@@ -869,44 +871,29 @@ function updateSpeedHistory() {
   lastUpdate.value = dayjs().format('HH:mm:ss')
 }
 
-// Lifecycle
-let refreshInterval
-let dashboardRefreshing = false
-
-async function refreshDashboard() {
-  if (document.hidden || dashboardRefreshing) return
-  dashboardRefreshing = true
-  try {
-    await Promise.all([
-      dashboardStore.fetchStats(),
-      dashboardStore.fetchDownloadersStatus(),
-      dashboardStore.fetchRecentActivity(),
-    ])
-    updateSpeedHistory()
-  } finally {
-    dashboardRefreshing = false
-  }
-}
-
-function handleDashboardVisibilityChange() {
-  if (!document.hidden) refreshDashboard()
-}
-
+const unsubscribeHandlers = []
 
 onMounted(async () => {
   await dashboardStore.fetchAll()
   updateSpeedHistory()
+  realtime.connect()
 
-  // Refresh stats, downloader status and recent activity every 5 seconds
-  refreshInterval = setInterval(refreshDashboard, 5000)
-  document.addEventListener('visibilitychange', handleDashboardVisibilityChange)
+  unsubscribeHandlers.push(
+    realtime.subscribe('dashboard_stats', (data) => {
+      dashboardStore.setStats(data)
+      updateSpeedHistory()
+    }),
+    realtime.subscribe('downloaders_status', (data) => {
+      dashboardStore.setDownloadersStatus(data)
+    }),
+    realtime.subscribe('services_status', (data) => {
+      dashboardStore.setServicesStatus(data)
+    })
+  )
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
-  document.removeEventListener('visibilitychange', handleDashboardVisibilityChange)
+  unsubscribeHandlers.forEach((unsubscribe) => unsubscribe())
 })
 </script>
 

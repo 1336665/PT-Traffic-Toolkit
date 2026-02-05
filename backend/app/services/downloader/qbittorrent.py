@@ -582,6 +582,24 @@ class QBittorrentClient(BaseDownloader):
         )
         return response is not None
 
+    async def set_torrent_location(self, torrent_hash: str, location: str) -> bool:
+        response = await self._request(
+            "POST",
+            "/api/v2/torrents/setLocation",
+            data={"hashes": torrent_hash, "location": location}
+        )
+        return response is not None
+
+    async def add_torrent_tags(self, torrent_hash: str, tags: list[str]) -> bool:
+        if not tags:
+            return False
+        response = await self._request(
+            "POST",
+            "/api/v2/torrents/addTags",
+            data={"hashes": torrent_hash, "tags": ",".join(tags)}
+        )
+        return response is not None
+
     async def pause_torrent(self, torrent_hash: str) -> bool:
         response = await self._request(
             "POST",

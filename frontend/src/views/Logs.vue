@@ -304,6 +304,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { logsApi } from '@/api'
 import { formatTime } from '@/utils/format'
 import { getToast } from '@/composables/useToast'
+import { useRealtime } from '@/services/realtime'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Modal from '@/components/common/Modal.vue'
@@ -330,10 +331,11 @@ const stats = ref({})
 const initialLoading = ref(true)  // 初始加载状态
 const refreshing = ref(false)     // 刷新按钮状态
 const clearing = ref(false)
-const autoRefresh = ref(false)
+const autoRefresh = ref(true)
 const showClearModal = ref(false)
 const clearHours = ref(24)
-let refreshInterval = null
+const realtime = useRealtime()
+const unsubscribeHandlers = []
 
 // 过滤器
 const filter = reactive({
@@ -509,31 +511,32 @@ watch(
   }
 )
 
-// 监听自动刷新开关
-watch(autoRefresh, (value) => {
-  if (value) {
-    refreshInterval = setInterval(loadLogs, 5000)
-  } else if (refreshInterval) {
-    clearInterval(refreshInterval)
-    refreshInterval = null
-  }
-})
-
 // 初始化
 onMounted(async () => {
   initialLoading.value = true
   await loadLogs()
   initialLoading.value = false
+  realtime.connect()
+  unsubscribeHandlers.push(
+    realtime.subscribe('logs', (newLogs) => {
+      if (!autoRefresh.value || !Array.isArray(newLogs)) return
+      const filtered = newLogs.filter(log => {
+        if (filter.level && log.level !== filter.level) return false
+        if (filter.module && log.module !== filter.module) return false
+        return true
+      })
+      if (filtered.length === 0) return
+      logs.value = [...filtered.reverse(), ...logs.value].slice(0, filter.limit)
+    })
+  )
 })
 
 // 清理
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
   if (filterDebounceTimer) {
     clearTimeout(filterDebounceTimer)
   }
+  unsubscribeHandlers.forEach((unsubscribe) => unsubscribe())
 })
 </script>
 

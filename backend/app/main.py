@@ -9,6 +9,7 @@ import logging
 from app.config import settings
 from app.database import init_db, init_sync_db
 from app.api import api_router
+from app.api.realtime import broadcaster as realtime_broadcaster
 from app.tasks import scheduler
 from app.utils import get_logger
 from app.utils.logger import init_db_logging
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     scheduler.stop()
+    await realtime_broadcaster.stop()
 
     # Close shared HTTP clients to avoid unclosed connection warnings
     try:
