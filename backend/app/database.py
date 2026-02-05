@@ -66,6 +66,7 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_delete_rule_columns(conn)
+        await _ensure_delete_record_columns(conn)
         await _ensure_speed_limit_site_columns(conn)
         await _ensure_u2_magic_config_columns(conn)
 
@@ -74,6 +75,10 @@ async def init_db():
 # This prevents potential SQL injection even though column names come from code
 _DELETE_RULE_COLUMNS_WHITELIST = frozenset({
     "pause", "only_delete_torrent", "limit_speed", "rule_type", "code"
+})
+
+_DELETE_RECORD_COLUMNS_WHITELIST = frozenset({
+    "action_type"
 })
 
 _SPEED_LIMIT_SITE_COLUMNS_WHITELIST = frozenset({
@@ -106,6 +111,21 @@ async def _ensure_delete_rule_columns(conn):
         if name not in existing:
             await conn.exec_driver_sql(f"ALTER TABLE delete_rules ADD COLUMN {name} {ddl}")
 
+
+async def _ensure_delete_record_columns(conn):
+    """Ensure delete_records table has action_type column."""
+    if conn.dialect.name != "sqlite":
+        return
+    result = await conn.exec_driver_sql("PRAGMA table_info(delete_records)")
+    existing = {row[1] for row in result.fetchall()}
+    columns = {
+        "action_type": "VARCHAR(20) DEFAULT 'delete'",
+    }
+    for name, ddl in columns.items():
+        if name not in _DELETE_RECORD_COLUMNS_WHITELIST:
+            raise ValueError(f"Column name '{name}' not in whitelist")
+        if name not in existing:
+            await conn.exec_driver_sql(f"ALTER TABLE delete_records ADD COLUMN {name} {ddl}")
 
 async def _ensure_speed_limit_site_columns(conn):
     """Ensure speed_limit_sites table has new peer list columns."""
@@ -150,6 +170,7 @@ def init_sync_db():
     """Initialize sync database tables (for logger)"""
     Base.metadata.create_all(bind=sync_engine)
     _ensure_delete_rule_columns_sync()
+    _ensure_delete_record_columns_sync()
     _ensure_speed_limit_site_columns_sync()
     _ensure_u2_magic_config_columns_sync()
 
@@ -174,6 +195,21 @@ def _ensure_delete_rule_columns_sync():
             if name not in existing:
                 conn.exec_driver_sql(f"ALTER TABLE delete_rules ADD COLUMN {name} {ddl}")
 
+
+def _ensure_delete_record_columns_sync():
+    if sync_engine.dialect.name != "sqlite":
+        return
+    with sync_engine.begin() as conn:
+        result = conn.exec_driver_sql("PRAGMA table_info(delete_records)")
+        existing = {row[1] for row in result.fetchall()}
+        columns = {
+            "action_type": "VARCHAR(20) DEFAULT 'delete'",
+        }
+        for name, ddl in columns.items():
+            if name not in _DELETE_RECORD_COLUMNS_WHITELIST:
+                raise ValueError(f"Column name '{name}' not in whitelist")
+            if name not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE delete_records ADD COLUMN {name} {ddl}")
 
 def _ensure_speed_limit_site_columns_sync():
     if sync_engine.dialect.name != "sqlite":

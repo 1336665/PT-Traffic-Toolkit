@@ -757,6 +757,7 @@ class TorrentState:
     waiting_reannounce: bool = False
     next_announce_time: Optional[float] = None
     announce_interval: Optional[int] = None
+    last_good_interval: Optional[int] = None
     min_announce: Optional[int] = None  # tracker min announce（秒），用于持久化/调试
     # next_announce 是否可靠（用于处理部分 libtorrent/qB 显示异常）
     next_announce_is_true: bool = False
@@ -850,6 +851,9 @@ class TorrentState:
         # 如果客户端提供了间隔
         if self.announce_interval and self.announce_interval > 0:
             return self.announce_interval
+
+        if self.last_good_interval and self.last_good_interval > 0:
+            return self.last_good_interval
 
         # 根据种子发布时间估算（优先）或添加时间，使用做种时间辅助判断
         if self.publish_time and self.publish_time > 0:
@@ -1083,6 +1087,7 @@ class TorrentState:
             'waiting_reannounce': self.waiting_reannounce,
             'next_announce_time': self.next_announce_time,
             'announce_interval': self.announce_interval,
+            'last_good_interval': self.last_good_interval,
             'min_announce': self.min_announce,
             'next_announce_is_true': self.next_announce_is_true,
             'last_next_remaining': self.last_next_remaining,
@@ -1134,6 +1139,7 @@ class TorrentState:
             waiting_reannounce=data.get('waiting_reannounce', False),
             next_announce_time=data.get('next_announce_time'),
             announce_interval=data.get('announce_interval'),
+            last_good_interval=data.get('last_good_interval'),
             min_announce=(int(data.get('min_announce')) if data.get('min_announce') is not None else None),
             next_announce_is_true=data.get('next_announce_is_true', False),
             last_next_remaining=data.get('last_next_remaining'),
@@ -1477,6 +1483,18 @@ class SpeedLimiterService:
         # - ana=None: 未判定，继续观察
         self._ana_state: Dict[int, Dict[str, Any]] = {}
         self._FORCED_REANNOUNCE_INTERVAL: int = 900  # 强制汇报间隔（秒），用于识别 reannounce 偏差
+
+    @staticmethod
+    def _normalize_interval(value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            interval = int(value)
+        except Exception:
+            return None
+        if interval < 120 or interval > 8 * 3600:
+            return None
+        return interval
 
 
     async def get_config(self) -> Optional[SpeedLimitConfig]:
@@ -2220,6 +2238,12 @@ class SpeedLimiterService:
         downloaders = result.scalars().all()
         auto_downloaders = [dl for dl in downloaders if dl.auto_speed_limit]
         if auto_downloaders:
+            if len(auto_downloaders) < len(downloaders):
+                logger.info(
+                    "Speed limit scoped to %d/%d downloader(s) with auto_speed_limit enabled.",
+                    len(auto_downloaders),
+                    len(downloaders),
+                )
             downloaders = auto_downloaders
 
         results = {}
@@ -2302,12 +2326,13 @@ class SpeedLimiterService:
                         # 获取汇报时间信息 - 关键链路
                         # 始终尝试从 qBittorrent 获取最新的 reannounce 数据
                         next_announce = torrent.next_announce_time
-                        announce_interval = torrent.announce_interval
+                        announce_interval = self._normalize_interval(torrent.announce_interval)
                         fetch_attempted = False
 
                         # 总是尝试获取最新数据（不仅仅是当 None 时）
                         try:
                             tracker_next, tracker_interval = await client.get_torrent_announce_info(torrent.hash)
+                            tracker_interval = self._normalize_interval(tracker_interval)
                             fetch_attempted = True
 
                             # 如果获取到有效的 next_announce，使用它
@@ -2317,8 +2342,9 @@ class SpeedLimiterService:
                                 logger.debug(f"[{torrent.name[:20]}] 获取 next_announce: {remaining}秒后")
 
                             # 如果获取到有效的 interval，使用它
-                            if tracker_interval and tracker_interval > 0:
+                            if tracker_interval:
                                 announce_interval = tracker_interval
+                                state.last_good_interval = tracker_interval
 
                         except Exception as e:
                             logger.debug(f"获取 tracker 信息失败: {e}")
@@ -2333,7 +2359,7 @@ class SpeedLimiterService:
                         # 说明：
                         # - qB trackers/properties 不一定提供真实 interval；如果直接用 added_time 估算，会把“刚下载的老种”当新种。
                         # - u2_magic.py 通过网页发布时间 delta 判定汇报周期，因此这里必须优先拿 publish_time。
-                        interval_hint = announce_interval
+                        interval_hint = announce_interval or state.last_good_interval
                         cycle_interval = 0
 
                         # 1) 站点自定义间隔优先
@@ -2377,8 +2403,9 @@ class SpeedLimiterService:
                                     state.cycle_interval = float(cycle_interval)
                                     state.cycle_synced = True
                             # 无论如何都记录当前 announce_interval（用于 UI/debug）
-                            if cycle_interval > 0:
-                                state.announce_interval = int(cycle_interval)
+                                if cycle_interval > 0:
+                                    state.announce_interval = int(cycle_interval)
+                                    state.last_good_interval = int(cycle_interval)
 
                         # 3) 其他站点：优先用客户端 interval，否则回退状态估算
                         else:
@@ -2393,6 +2420,7 @@ class SpeedLimiterService:
                             if cycle_interval > 0 and ((not state.cycle_synced) or state.cycle_interval <= 0):
                                 state.cycle_interval = float(cycle_interval)
                                 state.cycle_synced = True
+                                state.last_good_interval = int(cycle_interval)
 
 
                         # === u2_magic(脚本)风格：next_announce 可靠性检测 + peerlist 兜底 ===

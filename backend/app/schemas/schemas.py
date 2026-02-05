@@ -294,6 +294,7 @@ class DeleteRecordResponse(BaseModel):
     tracker: str
     files_deleted: bool
     reported: bool
+    action_type: str
     deleted_at: datetime
 
     class Config:

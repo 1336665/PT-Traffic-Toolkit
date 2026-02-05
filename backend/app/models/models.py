@@ -205,6 +205,7 @@ class DeleteRecord(Base):
 
     files_deleted = Column(Boolean, default=True)
     reported = Column(Boolean, default=False)
+    action_type = Column(String(20), default="delete")
     deleted_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     # Composite index for time-based queries
