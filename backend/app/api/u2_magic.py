@@ -16,6 +16,35 @@ from app.services.u2_magic import U2MagicService
 router = APIRouter(prefix="/u2-magic", tags=["U2 Magic"])
 
 
+@router.get("/stats")
+async def get_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get U2 magic summary statistics (total, downloaded, skipped, totalSize)"""
+    # Total count
+    total_result = await db.execute(select(func.count(U2MagicRecord.id)))
+    total = total_result.scalar() or 0
+
+    # Downloaded count and total size
+    dl_result = await db.execute(
+        select(
+            func.count(U2MagicRecord.id),
+            func.coalesce(func.sum(U2MagicRecord.size), 0)
+        ).where(U2MagicRecord.downloaded == True)
+    )
+    row = dl_result.first()
+    downloaded = row[0] or 0
+    total_size = row[1] or 0
+
+    return {
+        "total": total,
+        "downloaded": downloaded,
+        "skipped": total - downloaded,
+        "totalSize": total_size,
+    }
+
+
 @router.get("/config", response_model=U2MagicConfigResponse)
 async def get_config(
     db: AsyncSession = Depends(get_db),

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import (
     User, Downloader, RssRecord, DeleteRecord, U2MagicRecord,
-    SpeedLimitConfig, U2MagicConfig
+    SpeedLimitConfig, U2MagicConfig, SpeedLimitRecord
 )
 from app.schemas import DashboardStats, TimelineItem
 from app.services.auth import get_current_user
@@ -306,7 +306,6 @@ async def get_recent_activity(
     since = datetime.utcnow() - timedelta(hours=hours)
     # Use **local timezone** day boundary, then convert to UTC for DB comparisons
     today_start = local_day_start_utc()
-    today_str = datetime.now().strftime('%Y-%m-%d')
 
     # RSS downloads
     rss_result = await db.execute(
@@ -334,59 +333,18 @@ async def get_recent_activity(
     )
     magic_downloads = magic_result.scalar() or 0
 
-    # Today's upload/download - calculate from downloader stats with daily baseline
-    from app.models import DailyTrafficBaseline
-    today_uploaded = 0
-    today_downloaded = 0
-
-    # Get all enabled downloaders and their current stats
-    dl_result = await db.execute(
-        select(Downloader).where(Downloader.enabled == True)
+    # Today's upload/download - sum incremental deltas from SpeedLimitRecord
+    # This is more accurate than the baseline approach because it survives
+    # client restarts (each record stores the delta, not cumulative values).
+    speed_result = await db.execute(
+        select(
+            func.coalesce(func.sum(SpeedLimitRecord.uploaded), 0),
+            func.coalesce(func.sum(SpeedLimitRecord.downloaded), 0)
+        ).where(SpeedLimitRecord.created_at >= today_start)
     )
-    downloaders = dl_result.scalars().all()
-
-    for downloader in downloaders:
-        try:
-            async with downloader_client(downloader) as client:
-                if client:
-                    stats = await client.get_stats()
-                    current_uploaded = stats.total_uploaded
-                    current_downloaded = stats.total_downloaded
-
-                    # Get or create today's baseline for this downloader
-                    baseline_result = await db.execute(
-                        select(DailyTrafficBaseline).where(
-                            DailyTrafficBaseline.date == today_str,
-                            DailyTrafficBaseline.downloader_id == downloader.id
-                        )
-                    )
-                    baseline = baseline_result.scalar_one_or_none()
-
-                    if baseline is None:
-                        # Create new baseline for today
-                        baseline = DailyTrafficBaseline(
-                            date=today_str,
-                            downloader_id=downloader.id,
-                            baseline_uploaded=current_uploaded,
-                            baseline_downloaded=current_downloaded,
-                            latest_uploaded=current_uploaded,
-                            latest_downloaded=current_downloaded
-                        )
-                        db.add(baseline)
-                        await db.commit()
-                    else:
-                        # Update latest values
-                        baseline.latest_uploaded = current_uploaded
-                        baseline.latest_downloaded = current_downloaded
-                        await db.commit()
-
-                    # Calculate today's traffic
-                    today_uploaded += max(0, current_uploaded - baseline.baseline_uploaded)
-                    today_downloaded += max(0, current_downloaded - baseline.baseline_downloaded)
-        except asyncio.TimeoutError:
-            pass
-        except Exception:
-            pass
+    speed_row = speed_result.first()
+    today_uploaded = speed_row[0] or 0
+    today_downloaded = speed_row[1] or 0
 
     return {
         "period_hours": hours,

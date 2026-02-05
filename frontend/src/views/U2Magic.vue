@@ -619,13 +619,11 @@ async function loadRecords() {
 
 async function loadStats() {
   try {
-    // 获取全部记录的统计（不带过滤）
-    const allResponse = await u2MagicApi.getRecords({ page: 1, page_size: 1 })
-    const downloadedResponse = await u2MagicApi.getRecords({ page: 1, page_size: 1, downloaded: true })
-    stats.value.total = allResponse.data.total
-    stats.value.downloaded = downloadedResponse.data.total
-    stats.value.skipped = stats.value.total - stats.value.downloaded
-    // totalSize 需要单独计算，暂时保持为0或从后端获取
+    const response = await u2MagicApi.getStats()
+    stats.value.total = response.data.total
+    stats.value.downloaded = response.data.downloaded
+    stats.value.skipped = response.data.skipped
+    stats.value.totalSize = response.data.totalSize
   } catch (error) {
     console.error('Failed to load stats:', error)
   }

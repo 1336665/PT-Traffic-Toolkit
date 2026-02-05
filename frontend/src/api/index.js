@@ -138,6 +138,7 @@ export const u2MagicApi = {
   updateConfig: (data) => api.put('/u2-magic/config', data),
   fetch: () => api.post('/u2-magic/fetch'),
   getRecords: (params) => api.get('/u2-magic/records', { params }),
+  getStats: () => api.get('/u2-magic/stats'),
   deleteRecord: (id) => api.delete(`/u2-magic/records/${id}`),
 }
 
