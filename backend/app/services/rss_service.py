@@ -8,7 +8,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import RssFeed, RssRecord, Downloader
+from app.models import RssFeed, RssRecord, Downloader, DownloaderType
 from app.config import settings
 from app.services.downloader.context import downloader_client
 from app.utils import parse_size, get_logger
@@ -488,7 +488,7 @@ class RssService:
         return True, ""
 
     async def get_best_downloader(self) -> Optional[Downloader]:
-        """Get downloader with most free space"""
+        """Select best downloader using weighted resource scoring."""
         result = await self.db.execute(
             select(Downloader).where(Downloader.enabled == True)
         )
@@ -499,18 +499,41 @@ class RssService:
             return None
 
         best_downloader = None
-        best_free_space = 0
+        best_score = -1.0
+
+        preferred_type = DownloaderType.QBITTORRENT
 
         for dl in downloaders:
             try:
                 async with downloader_client(dl) as client:
                     if not client:
                         continue
-                    free_space = await client.get_free_space()
-                    logger.debug(f"Downloader '{dl.name}' free space: {free_space / (1024**3):.2f} GB")
+                    stats = await client.get_stats()
+                    free_space = stats.free_space
+                    active_downloads = stats.downloading_torrents
+                    total_torrents = stats.total_torrents
+                    upload_speed = stats.upload_speed
+                    download_speed = stats.download_speed
 
-                    if free_space > best_free_space:
-                        best_free_space = free_space
+                    if dl.max_active_downloads and active_downloads >= dl.max_active_downloads:
+                        logger.debug(f"Downloader '{dl.name}' at max active downloads")
+                        continue
+
+                    free_score = min(free_space / (1024 ** 3) / 100, 1.0)
+                    activity_score = 1.0 - min(active_downloads / 20, 1.0)
+                    speed_score = min((upload_speed + download_speed) / (20 * 1024 ** 2), 1.0)
+                    type_bonus = 0.15 if dl.type == preferred_type else 0.0
+
+                    score = (free_score * 0.55) + (activity_score * 0.3) + (speed_score * 0.15) + type_bonus
+
+                    logger.debug(
+                        f"Downloader '{dl.name}' score={score:.2f} "
+                        f"(free={free_space / (1024**3):.2f}GB, "
+                        f"active={active_downloads}, total={total_torrents})"
+                    )
+
+                    if score > best_score:
+                        best_score = score
                         best_downloader = dl
             except Exception as e:
                 logger.debug(f"Error checking downloader '{dl.name}': {e}")
@@ -518,7 +541,7 @@ class RssService:
 
         if best_downloader:
             logger.info(
-                f"Selected downloader: {best_downloader.name} with {best_free_space / (1024**3):.2f} GB free"
+                f"Selected downloader: {best_downloader.name} with score {best_score:.2f}"
             )
 
         return best_downloader

@@ -161,6 +161,14 @@ class BaseDownloader(ABC):
         """Resume all torrents"""
         pass
 
+    async def set_torrent_location(self, torrent_hash: str, location: str) -> bool:
+        """Move torrent files to a new location"""
+        return False
+
+    async def add_torrent_tags(self, torrent_hash: str, tags: List[str]) -> bool:
+        """Add tags to a torrent"""
+        return False
+
     async def add_torrent_file(
         self,
         file_content: bytes,

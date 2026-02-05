@@ -3,12 +3,25 @@
 import asyncio
 from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import select
 import httpx
 
 from app.config import settings
+from app.database import async_session_maker
+from app.models import WebhookEndpoint
+from app.services.webhooks import deliver_webhook
 from app.utils import get_logger
 
 logger = get_logger('pt_manager.notification')
+
+
+async def _notify_webhooks(event: str, payload: dict) -> None:
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(WebhookEndpoint).where(WebhookEndpoint.enabled == True)
+        )
+        for webhook in result.scalars().all():
+            await deliver_webhook(webhook, event, payload)
 
 
 class TelegramNotifier:
@@ -266,40 +279,61 @@ def init_notifier(bot_token: str = "", chat_id: str = ""):
 async def notify_rss_download(feed_name: str, torrent_name: str, size_bytes: float) -> bool:
     """Send RSS download notification"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     size_gb = size_bytes / (1024 ** 3)
     message = NotificationTemplates.rss_download(feed_name, torrent_name, size_gb)
+    await _notify_webhooks("rss_download", {
+        "feed_name": feed_name,
+        "torrent_name": torrent_name,
+        "size_bytes": size_bytes,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
 
 
 async def notify_rss_batch(feed_name: str, count: int, total_size_bytes: float) -> bool:
     """Send RSS batch download notification"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     total_gb = total_size_bytes / (1024 ** 3)
     message = NotificationTemplates.rss_batch_download(feed_name, count, total_gb)
+    await _notify_webhooks("rss_batch", {
+        "feed_name": feed_name,
+        "count": count,
+        "total_size_bytes": total_size_bytes,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
 
 
 async def notify_delete(rule_name: str, torrent_name: str, ratio: float, seeding_seconds: int) -> bool:
     """Send delete notification"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     seeding_hours = seeding_seconds / 3600
     message = NotificationTemplates.delete_action(rule_name, torrent_name, ratio, seeding_hours)
+    await _notify_webhooks("delete", {
+        "rule_name": rule_name,
+        "torrent_name": torrent_name,
+        "ratio": ratio,
+        "seeding_seconds": seeding_seconds,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
 
 
 async def notify_delete_batch(rule_name: str, count: int, total_uploaded_bytes: float) -> bool:
     """Send batch delete notification"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     total_gb = total_uploaded_bytes / (1024 ** 3)
     message = NotificationTemplates.delete_batch(rule_name, count, total_gb)
+    await _notify_webhooks("delete_batch", {
+        "rule_name": rule_name,
+        "count": count,
+        "total_uploaded_bytes": total_uploaded_bytes,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
 
 
@@ -312,39 +346,53 @@ async def notify_speed_limit(
 ) -> bool:
     """Send speed limit report notification"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     current_mbps = current_speed / (1024 ** 2)
     target_mbps = target_speed / (1024 ** 2)
     uploaded_gb = uploaded / (1024 ** 3)
     message = NotificationTemplates.speed_limit_report(tracker, current_mbps, target_mbps, uploaded_gb, phase)
+    await _notify_webhooks("speed_limit", {
+        "tracker": tracker,
+        "current_speed": current_speed,
+        "target_speed": target_speed,
+        "uploaded": uploaded,
+        "phase": phase,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
 
 
 async def notify_error(module: str, error_message: str) -> bool:
     """Send error alert notification"""
     notifier = get_notifier()
+    message = NotificationTemplates.error_alert(module, error_message)
+    await _notify_webhooks("error", {"module": module, "error_message": error_message})
     if not notifier.is_configured:
         return False
-    message = NotificationTemplates.error_alert(module, error_message)
     return await notifier.send_message(message)
 
 
 async def notify_downloader_offline(downloader_name: str) -> bool:
     """Send downloader offline notification"""
     notifier = get_notifier()
+    message = NotificationTemplates.downloader_offline(downloader_name)
+    await _notify_webhooks("downloader_offline", {"downloader_name": downloader_name})
     if not notifier.is_configured:
         return False
-    message = NotificationTemplates.downloader_offline(downloader_name)
     return await notifier.send_message(message)
 
 
 async def notify_low_disk_space(downloader_name: str, free_space_bytes: float, threshold_bytes: float) -> bool:
     """Send low disk space warning"""
     notifier = get_notifier()
-    if not notifier.is_configured:
-        return False
     free_gb = free_space_bytes / (1024 ** 3)
     threshold_gb = threshold_bytes / (1024 ** 3)
     message = NotificationTemplates.low_disk_space(downloader_name, free_gb, threshold_gb)
+    await _notify_webhooks("low_disk_space", {
+        "downloader_name": downloader_name,
+        "free_space_bytes": free_space_bytes,
+        "threshold_bytes": threshold_bytes,
+    })
+    if not notifier.is_configured:
+        return False
     return await notifier.send_message(message)
