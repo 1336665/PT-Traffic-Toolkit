@@ -129,7 +129,7 @@
             </div>
             <div>
               <h3 class="font-semibold text-surface-900 dark:text-white">当前会话</h3>
-              <p class="text-xs text-surface-500 dark:text-surface-400">活跃的限速会话 · 每{{ refreshInterval/1000 }}秒刷新</p>
+              <p class="text-xs text-surface-500 dark:text-surface-400">活跃的限速会话 · 实时推送更新</p>
             </div>
           </div>
           <div class="text-xs text-surface-400">
@@ -664,6 +664,7 @@ import 'dayjs/locale/zh-cn'
 import { speedLimitApi } from '@/api'
 import { useSettingsStore } from '@/stores/settings'
 import { formatSpeed, formatSize, formatDuration } from '@/utils/format'
+import { useRealtime } from '@/services/realtime'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Modal from '@/components/common/Modal.vue'
@@ -687,15 +688,14 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const toast = getToast()
+const realtime = useRealtime()
+const unsubscribeHandlers = []
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent])
 
 dayjs.locale('zh-cn')
 
 const settingsStore = useSettingsStore()
-const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
-const refreshInterval = isMobile ? 4000 : 2000  // 移动端降频，减少卡顿
-
 const config = reactive({
   enabled: false,
   target_upload_speed: 0,
@@ -1147,38 +1147,21 @@ async function deleteSite(site) {
   }
 }
 
-let refreshTimer
-let refreshInProgress = false
-
-async function refreshData() {
-  // 页面不可见时不刷新，避免后台消耗资源
-  if (document.hidden || refreshInProgress) return
-  refreshInProgress = true
-  try {
-    await Promise.all([loadStatus(), loadRecords()])
-  } finally {
-    refreshInProgress = false
-  }
-}
-
-function handleVisibilityChange() {
-  if (!document.hidden) {
-    refreshData()
-  }
-}
-
-
 onMounted(() => {
   loadConfig()
   loadSites()
-  refreshData()
-
-  refreshTimer = setInterval(refreshData, refreshInterval)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
+  loadStatus()
+  loadRecords()
+  realtime.connect()
+  unsubscribeHandlers.push(
+    realtime.subscribe('speed_limit_status', (data) => {
+      status.value = data
+      lastRefresh.value = dayjs().format('HH:mm:ss')
+    })
+  )
 })
 
 onUnmounted(() => {
-  if (refreshTimer) clearInterval(refreshTimer)
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  unsubscribeHandlers.forEach((unsubscribe) => unsubscribe())
 })
 </script>

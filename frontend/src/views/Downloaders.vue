@@ -370,6 +370,7 @@ import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { getToast } from '@/composables/useToast'
 import { downloadersApi } from '@/api'
 import { formatSpeed, formatSize } from '@/utils/format'
+import { useRealtime } from '@/services/realtime'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Modal from '@/components/common/Modal.vue'
@@ -400,8 +401,8 @@ const selectedDownloader = ref(null)
 const torrents = ref([])
 const loadingTorrents = ref(false)
 const loadingStatuses = ref(true)
-const statusRefreshInterval = ref(null)
-const torrentRefreshInterval = ref(null)
+const realtime = useRealtime()
+const unsubscribeHandlers = []
 
 const modalOpen = ref(false)
 const editingDownloader = ref(null)
@@ -470,48 +471,9 @@ async function loadStatuses() {
   }
 }
 
-function startAutoRefresh() {
-  // Refresh statuses every 5 seconds
-  statusRefreshInterval.value = setInterval(() => {
-    loadStatuses()
-  }, 5000)
-}
-
-function stopAutoRefresh() {
-  if (statusRefreshInterval.value) {
-    clearInterval(statusRefreshInterval.value)
-    statusRefreshInterval.value = null
-  }
-  if (torrentRefreshInterval.value) {
-    clearInterval(torrentRefreshInterval.value)
-    torrentRefreshInterval.value = null
-  }
-}
-
-function startTorrentAutoRefresh() {
-  // Stop existing interval if any
-  if (torrentRefreshInterval.value) {
-    clearInterval(torrentRefreshInterval.value)
-  }
-  // Refresh torrents every 5 seconds when a downloader is selected
-  torrentRefreshInterval.value = setInterval(() => {
-    if (selectedDownloader.value) {
-      loadTorrents(true) // silent refresh
-    }
-  }, 5000)
-}
-
-function stopTorrentAutoRefresh() {
-  if (torrentRefreshInterval.value) {
-    clearInterval(torrentRefreshInterval.value)
-    torrentRefreshInterval.value = null
-  }
-}
-
 function selectDownloader(dl) {
   selectedDownloader.value = dl
   loadTorrents()
-  startTorrentAutoRefresh()
 }
 
 async function loadTorrents(silent = false) {
@@ -533,6 +495,35 @@ async function loadTorrents(silent = false) {
       loadingTorrents.value = false
     }
   }
+}
+
+function applyRealtimeStatuses(statusList) {
+  const newStatuses = {}
+  for (const status of statusList) {
+    newStatuses[status.id] = status
+  }
+  statuses.value = newStatuses
+  loadingStatuses.value = false
+}
+
+function applyTorrentChanges(payload) {
+  if (!selectedDownloader.value || payload.downloader_id !== selectedDownloader.value.id) return
+  const updated = [...torrents.value]
+  for (const change of payload.changes || []) {
+    const index = updated.findIndex(t => t.hash === change.hash)
+    if (index >= 0) {
+      updated[index] = { ...updated[index], ...change }
+    } else {
+      updated.unshift(change)
+    }
+  }
+  for (const removedHash of payload.removed || []) {
+    const index = updated.findIndex(t => t.hash === removedHash)
+    if (index >= 0) {
+      updated.splice(index, 1)
+    }
+  }
+  torrents.value = updated
 }
 
 function openModal(downloader = null) {
@@ -645,17 +636,21 @@ async function deleteTorrent(torrent) {
 
 onMounted(() => {
   loadDownloaders()
-  startAutoRefresh()
+  realtime.connect()
+  unsubscribeHandlers.push(
+    realtime.subscribe('downloaders_status', applyRealtimeStatuses),
+    realtime.subscribe('torrent_changes', applyTorrentChanges)
+  )
 })
 
 onUnmounted(() => {
-  stopAutoRefresh()
+  unsubscribeHandlers.forEach((unsubscribe) => unsubscribe())
 })
 
 // Watch for selectedDownloader changes to manage torrent refresh
 watch(selectedDownloader, (newVal, oldVal) => {
   if (!newVal) {
-    stopTorrentAutoRefresh()
+    torrents.value = []
   }
 })
 </script>

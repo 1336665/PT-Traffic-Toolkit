@@ -67,6 +67,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
+  function setStats(data) {
+    stats.value = data
+  }
+
+  function setDownloadersStatus(data) {
+    downloadersStatus.value = data
+  }
+
+  function setServicesStatus(data) {
+    servicesStatus.value = data
+  }
+
   async function fetchAll() {
     loading.value = true
     await Promise.all([
@@ -92,5 +104,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchServicesStatus,
     fetchRecentActivity,
     fetchAll,
+    setStats,
+    setDownloadersStatus,
+    setServicesStatus,
   }
 })

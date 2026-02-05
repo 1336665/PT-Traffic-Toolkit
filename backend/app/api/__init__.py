@@ -11,6 +11,10 @@ from app.api.logs import router as logs_router
 from app.api.statistics import router as statistics_router
 from app.api.settings import router as settings_router
 from app.api.netcup import router as netcup_router
+from app.api.traffic_budget import router as traffic_budget_router
+from app.api.webhooks import router as webhooks_router
+from app.api.realtime import router as realtime_router
+from app.api.lifecycle import router as lifecycle_router
 
 api_router = APIRouter(prefix="/api")
 
@@ -25,3 +29,7 @@ api_router.include_router(logs_router)
 api_router.include_router(statistics_router)
 api_router.include_router(settings_router)
 api_router.include_router(netcup_router)
+api_router.include_router(traffic_budget_router)
+api_router.include_router(webhooks_router)
+api_router.include_router(realtime_router)
+api_router.include_router(lifecycle_router)
