@@ -652,6 +652,7 @@ class DeleteService:
             force_delete_files: If True, always delete local files regardless of rule setting
         """
         deleted_records = []
+        action_records = []
 
         # Get applicable downloaders
         # For manual execution (force_execute=True), don't require auto_delete to be enabled
@@ -696,6 +697,9 @@ class DeleteService:
         delete_count = 0
 
         for downloader in downloaders:
+            if rule.max_delete_count > 0 and delete_count >= rule.max_delete_count:
+                logger.debug(f"Rule '{rule.name}': Reached max delete count ({rule.max_delete_count})")
+                break
             matching = await self.get_matching_torrents(rule, downloader)
 
             if matching:
@@ -719,12 +723,15 @@ class DeleteService:
                 else:
                     delete_files = rule.delete_files and not rule.only_delete_torrent
 
+                action_type = "delete"
                 if rule.limit_speed and rule.limit_speed > 0:
                     action_taken = await self._limit_torrent(
                         downloader, torrent, rule.limit_speed
                     )
+                    action_type = "limit"
                 elif rule.pause:
                     action_taken = await self._pause_torrent(downloader, torrent)
+                    action_type = "pause"
                 else:
                     action_taken = await self._delete_torrent(
                         downloader, torrent, delete_files, rule.force_report
@@ -733,7 +740,7 @@ class DeleteService:
                 if action_taken:
                     delete_count += 1
 
-                    if not rule.pause and not (rule.limit_speed and rule.limit_speed > 0):
+                    if action_type == "delete":
                         record = DeleteRecord(
                             rule_id=rule.id,
                             rule_name=rule.name,
@@ -749,9 +756,31 @@ class DeleteService:
                             tracker=torrent.tracker,
                             files_deleted=delete_files,
                             reported=rule.force_report,
+                            action_type=action_type,
                         )
                         self.db.add(record)
                         deleted_records.append(record)
+                        action_records.append(record)
+                    else:
+                        record = DeleteRecord(
+                            rule_id=rule.id,
+                            rule_name=rule.name,
+                            downloader_id=downloader.id,
+                            downloader_name=downloader.name,
+                            torrent_hash=torrent.hash,
+                            torrent_name=torrent.name,
+                            size=torrent.size,
+                            uploaded=torrent.uploaded,
+                            downloaded=torrent.downloaded,
+                            ratio=torrent.ratio,
+                            seeding_time=torrent.seeding_time,
+                            tracker=torrent.tracker,
+                            files_deleted=False,
+                            reported=False,
+                            action_type=action_type,
+                        )
+                        self.db.add(record)
+                        action_records.append(record)
 
                     # Clear from duration cache
                     key = self._duration_cache_key(downloader.id, rule.id, torrent.hash)
@@ -761,7 +790,7 @@ class DeleteService:
                     logger.warning(f"Rule '{rule.name}': Failed to execute action on {torrent.name[:50]}")
 
         # Single commit for all records
-        if deleted_records:
+        if action_records:
             await self.db.commit()
 
             # Send Telegram notification for batch delete
@@ -870,7 +899,9 @@ class DeleteService:
             async with downloader_client(downloader) as client:
                 if not client:
                     return False
-                success = await client.set_torrent_download_limit(torrent.hash, limit_speed)
+                download_success = await client.set_torrent_download_limit(torrent.hash, limit_speed)
+                upload_success = await client.set_torrent_upload_limit(torrent.hash, limit_speed)
+                success = download_success and upload_success
 
             if success:
                 logger.info(

@@ -294,6 +294,7 @@ class DeleteRecordResponse(BaseModel):
     tracker: str
     files_deleted: bool
     reported: bool
+    action_type: str
     deleted_at: datetime
 
     class Config:
@@ -566,3 +567,101 @@ class NotificationSettings(BaseModel):
     notify_speed_limit: bool = True
     notify_error: bool = True
     notify_low_disk: bool = True
+
+
+# ============ Webhook Schemas ============
+
+class WebhookEndpointBase(BaseModel):
+    name: str
+    url: str
+    enabled: bool = True
+    events: List[str] = []
+    secret: str = ""
+
+
+class WebhookEndpointCreate(WebhookEndpointBase):
+    pass
+
+
+class WebhookEndpointUpdate(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    enabled: Optional[bool] = None
+    events: Optional[List[str]] = None
+    secret: Optional[str] = None
+
+
+class WebhookEndpointResponse(WebhookEndpointBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Traffic Budget Schemas ============
+
+class TrafficBudgetConfigBase(BaseModel):
+    enabled: bool = False
+    monthly_quota_gb: float = 0
+    reset_day: int = 1
+    warning_threshold: float = 0.8
+    hard_limit: bool = False
+    enforce_limits: bool = False
+    downloader_type: str = "qbittorrent"
+    max_upload_limit_kbps: int = 0
+
+
+class TrafficBudgetConfigUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    monthly_quota_gb: Optional[float] = None
+    reset_day: Optional[int] = None
+    warning_threshold: Optional[float] = None
+    hard_limit: Optional[bool] = None
+    enforce_limits: Optional[bool] = None
+    downloader_type: Optional[str] = None
+    max_upload_limit_kbps: Optional[int] = None
+
+
+class TrafficBudgetConfigResponse(TrafficBudgetConfigBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TrafficBudgetStatus(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    uploaded_gb: float
+    downloaded_gb: float
+    total_gb: float
+    quota_gb: float
+    usage_ratio: float
+    remaining_gb: float
+    warning: bool
+    exceeded: bool
+
+
+# ============ Lifecycle Schemas ============
+
+class TorrentScore(BaseModel):
+    hash: str
+    name: str
+    score: float
+    ratio: float
+    seeding_time: int
+    upload_speed: float
+    download_speed: float
+    status: str
+    recommendation: str
+
+
+class LifecycleActionRequest(BaseModel):
+    downloader_id: int
+    torrent_hashes: List[str]
+    action: str
+    archive_path: Optional[str] = None

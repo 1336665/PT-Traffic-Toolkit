@@ -205,6 +205,7 @@ class DeleteRecord(Base):
 
     files_deleted = Column(Boolean, default=True)
     reported = Column(Boolean, default=False)
+    action_type = Column(String(20), default="delete")
     deleted_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     # Composite index for time-based queries
@@ -435,6 +436,39 @@ class LogRecord(Base):
         Index('ix_log_records_timestamp_level', 'timestamp', 'level'),
         Index('ix_log_records_timestamp_module', 'timestamp', 'module'),
     )
+
+
+class WebhookEndpoint(Base):
+    """Webhook endpoints for notification routing."""
+    __tablename__ = "webhook_endpoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    url = Column(String(1000), nullable=False)
+    enabled = Column(Boolean, default=True)
+    events = Column(JSON, default=list)
+    secret = Column(String(255), default="")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrafficBudgetConfig(Base):
+    """Monthly traffic budget configuration."""
+    __tablename__ = "traffic_budget_config"
+
+    id = Column(Integer, primary_key=True, index=True)
+    enabled = Column(Boolean, default=False)
+    monthly_quota_gb = Column(Float, default=0)
+    reset_day = Column(Integer, default=1)  # 1-28
+    warning_threshold = Column(Float, default=0.8)  # 0-1
+    hard_limit = Column(Boolean, default=False)
+    enforce_limits = Column(Boolean, default=False)
+    downloader_type = Column(String(50), default="qbittorrent")
+    max_upload_limit_kbps = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class DailyTrafficBaseline(Base):
