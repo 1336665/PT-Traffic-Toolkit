@@ -78,6 +78,10 @@ function subscribe(event, handler) {
 }
 
 function disconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
   if (socket) {
     socket.close()
   }

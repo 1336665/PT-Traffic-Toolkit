@@ -30,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', token.value)
       initialized.value = true
       // Don't await fetchUser - let it happen in background
-      fetchUser()
+      fetchUser().catch(() => {})
     } finally {
       loading.value = false
     }
@@ -43,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = response.data.access_token
       localStorage.setItem('token', token.value)
       // Don't await fetchUser - redirect immediately and fetch in background
-      fetchUser()
+      fetchUser().catch(() => {})
     } finally {
       loading.value = false
     }
@@ -71,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Initialize user if token exists (background)
   if (token.value) {
-    fetchUser()
+    fetchUser().catch(() => {})
   }
 
   return {

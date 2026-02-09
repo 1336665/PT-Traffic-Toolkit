@@ -38,7 +38,11 @@ async def _fetch_downloader_stats(downloader: Downloader) -> dict:
         async with downloader_client(downloader) as client:
             if client:
                 stats = await client.get_stats()
-                torrents = await client.get_torrents()
+                # Skip expensive per-torrent reannounce API calls for dashboard
+                try:
+                    torrents = await client.get_torrents(with_reannounce=False)
+                except TypeError:
+                    torrents = await client.get_torrents()
 
                 result["upload_speed"] = stats.upload_speed
                 result["download_speed"] = stats.download_speed

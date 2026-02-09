@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select, delete
 
 from app.config import settings
@@ -55,6 +54,15 @@ class TaskScheduler:
         self._speed_limit_task: Optional[asyncio.Task] = None
         self._speed_limit_enabled = False
         self._speed_limit_lock = asyncio.Lock()
+        self._setup_task: Optional[asyncio.Task] = None
+
+    def _on_setup_done(self, task: asyncio.Task):
+        """Callback for setup task completion to log any exceptions"""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"Failed to setup default jobs: {exc}")
 
     def start(self):
         """Start the scheduler"""
@@ -63,8 +71,9 @@ class TaskScheduler:
             self._running = True
             logger.info("Task scheduler started")
 
-            # Add default jobs
-            asyncio.create_task(self._setup_default_jobs())
+            # Add default jobs (store reference to prevent silent exception loss)
+            self._setup_task = asyncio.create_task(self._setup_default_jobs())
+            self._setup_task.add_done_callback(self._on_setup_done)
 
     def stop(self):
         """Stop the scheduler"""
@@ -355,7 +364,7 @@ class TaskScheduler:
                 )
                 downloaders = result.scalars().all()
 
-                now = datetime.now()
+                now = datetime.now()  # Use local time since torrent.added_time is local
                 report_window_start = timedelta(minutes=4, seconds=30)
                 report_window_end = timedelta(minutes=5, seconds=30)
 
@@ -367,7 +376,7 @@ class TaskScheduler:
 
                         reported_count = 0
                         try:
-                            torrents = await client.get_torrents()
+                            torrents = await client.get_torrents(with_reannounce=False)
 
                             for torrent in torrents:
                                 if torrent.added_time:
@@ -416,6 +425,11 @@ class TaskScheduler:
                         U2MagicRecord.created_at < cutoff_date,
                         U2MagicRecord.downloaded == False
                     )
+                )
+
+                # Clean up old Netcup records
+                await db.execute(
+                    delete(NetcupRecord).where(NetcupRecord.created_at < cutoff_date)
                 )
 
                 await db.commit()

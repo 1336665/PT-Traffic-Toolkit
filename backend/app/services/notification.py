@@ -43,7 +43,8 @@ class TelegramNotifier:
         self,
         text: str,
         parse_mode: str = "HTML",
-        disable_notification: bool = False
+        disable_notification: bool = False,
+        _retry_count: int = 0
     ) -> bool:
         """Send a message to Telegram
 
@@ -91,12 +92,12 @@ class TelegramNotifier:
                     return False
 
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
-                # Rate limited, wait and retry
-                retry_after = int(e.response.headers.get("Retry-After", 5))
-                logger.warning(f"Telegram rate limited, waiting {retry_after}s")
+            if e.response.status_code == 429 and _retry_count < 3:
+                # Rate limited, wait and retry (max 3 retries to prevent infinite recursion)
+                retry_after = min(int(e.response.headers.get("Retry-After", 5)), 60)
+                logger.warning(f"Telegram rate limited, waiting {retry_after}s (retry {_retry_count + 1}/3)")
                 await asyncio.sleep(retry_after)
-                return await self.send_message(text, parse_mode, disable_notification)
+                return await self.send_message(text, parse_mode, disable_notification, _retry_count + 1)
             logger.error(f"Telegram HTTP error: {e.response.status_code}")
             return False
         except Exception as e:

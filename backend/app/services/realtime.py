@@ -39,7 +39,7 @@ class RealtimeConnectionManager:
             return
         message = json.dumps(payload, default=str)
         stale = []
-        for websocket in self._connections:
+        for websocket in list(self._connections):
             try:
                 await websocket.send_text(message)
             except Exception:
@@ -55,6 +55,7 @@ class RealtimeBroadcaster:
         self._running = False
         self._last_log_id = 0
         self._last_torrent_state: dict[int, dict[str, str]] = {}
+        self._speed_limiter_cache: SpeedLimiterService | None = None
 
     async def start(self) -> None:
         if self._task and not self._task.done():
@@ -191,9 +192,12 @@ class RealtimeBroadcaster:
         await self.manager.broadcast({"type": "services_status", "payload": status})
 
     async def _broadcast_speed_limit(self, db) -> None:
-        service = SpeedLimiterService(db)
-        await service.load_state()
-        status = await service.get_cached_status()
+        if self._speed_limiter_cache is None:
+            self._speed_limiter_cache = SpeedLimiterService(db)
+            await self._speed_limiter_cache.load_state()
+        else:
+            self._speed_limiter_cache.db = db
+        status = await self._speed_limiter_cache.get_cached_status()
         await self.manager.broadcast({"type": "speed_limit_status", "payload": status})
 
     async def _broadcast_logs(self, db) -> None:

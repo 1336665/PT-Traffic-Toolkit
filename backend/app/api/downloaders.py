@@ -44,23 +44,25 @@ async def get_all_downloaders_status(
         """Get status for a single downloader"""
         try:
             client = create_downloader(downloader)
-            if await client.connect():
-                stats = await client.get_stats()
+            try:
+                if await client.connect():
+                    stats = await client.get_stats()
+                    return DownloaderStatus(
+                        id=downloader.id,
+                        name=downloader.name,
+                        online=True,
+                        upload_speed=stats.upload_speed,
+                        download_speed=stats.download_speed,
+                        free_space=stats.free_space,
+                        active_torrents=stats.active_torrents,
+                        total_torrents=stats.total_torrents,
+                        seeding_torrents=stats.seeding_torrents,
+                        downloading_torrents=stats.downloading_torrents,
+                        total_uploaded=stats.total_uploaded,
+                        total_downloaded=stats.total_downloaded,
+                    )
+            finally:
                 await client.disconnect()
-                return DownloaderStatus(
-                    id=downloader.id,
-                    name=downloader.name,
-                    online=True,
-                    upload_speed=stats.upload_speed,
-                    download_speed=stats.download_speed,
-                    free_space=stats.free_space,
-                    active_torrents=stats.active_torrents,
-                    total_torrents=stats.total_torrents,
-                    seeding_torrents=stats.seeding_torrents,
-                    downloading_torrents=stats.downloading_torrents,
-                    total_uploaded=stats.total_uploaded,
-                    total_downloaded=stats.total_downloaded,
-                )
         except asyncio.TimeoutError:
             logger.warning(f"下载器 {downloader.name} 连接超时")
         except ConnectionError as e:
@@ -169,22 +171,24 @@ async def test_downloader(
 
     try:
         client = create_downloader(downloader)
-        success = await client.connect()
-        if success:
-            stats = await client.get_stats()
-            await client.disconnect()
-            return {
-                "success": True,
-                "message": "Connection successful",
-                "stats": {
-                    "upload_speed": stats.upload_speed,
-                    "download_speed": stats.download_speed,
-                    "total_torrents": stats.total_torrents,
-                    "free_space": stats.free_space,
+        try:
+            success = await client.connect()
+            if success:
+                stats = await client.get_stats()
+                return {
+                    "success": True,
+                    "message": "Connection successful",
+                    "stats": {
+                        "upload_speed": stats.upload_speed,
+                        "download_speed": stats.download_speed,
+                        "total_torrents": stats.total_torrents,
+                        "free_space": stats.free_space,
+                    }
                 }
-            }
-        else:
-            return {"success": False, "message": "Connection failed"}
+            else:
+                return {"success": False, "message": "Connection failed"}
+        finally:
+            await client.disconnect()
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -205,23 +209,25 @@ async def get_downloader_status(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            stats = await client.get_stats()
+        try:
+            if await client.connect():
+                stats = await client.get_stats()
+                return DownloaderStatus(
+                    id=downloader.id,
+                    name=downloader.name,
+                    online=True,
+                    upload_speed=stats.upload_speed,
+                    download_speed=stats.download_speed,
+                    free_space=stats.free_space,
+                    active_torrents=stats.active_torrents,
+                    total_torrents=stats.total_torrents,
+                    seeding_torrents=stats.seeding_torrents,
+                    downloading_torrents=stats.downloading_torrents,
+                    total_uploaded=stats.total_uploaded,
+                    total_downloaded=stats.total_downloaded,
+                )
+        finally:
             await client.disconnect()
-            return DownloaderStatus(
-                id=downloader.id,
-                name=downloader.name,
-                online=True,
-                upload_speed=stats.upload_speed,
-                download_speed=stats.download_speed,
-                free_space=stats.free_space,
-                active_torrents=stats.active_torrents,
-                total_torrents=stats.total_torrents,
-                seeding_torrents=stats.seeding_torrents,
-                downloading_torrents=stats.downloading_torrents,
-                total_uploaded=stats.total_uploaded,
-                total_downloaded=stats.total_downloaded,
-            )
     except asyncio.TimeoutError:
         logger.warning(f"下载器 {downloader.name} 状态获取超时")
     except Exception as e:
@@ -250,40 +256,42 @@ async def get_downloader_torrents(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            torrents = await client.get_torrents()
+        try:
+            if await client.connect():
+                torrents = await client.get_torrents()
+                return [
+                    TorrentInfo(
+                        hash=t.hash,
+                        name=t.name,
+                        size=t.size,
+                        progress=t.progress,
+                        status=t.status,
+                        uploaded=t.uploaded,
+                        downloaded=t.downloaded,
+                        ratio=t.ratio,
+                        upload_speed=t.upload_speed,
+                        download_speed=t.download_speed,
+                        seeders=t.seeders,
+                        leechers=t.leechers,
+                        seeds_connected=t.seeds_connected,
+                        peers_connected=t.peers_connected,
+                        tracker=t.tracker,
+                        tags=",".join(t.tags),
+                        category=t.category,
+                        save_path=t.save_path,
+                        added_time=t.added_time,
+                        seeding_time=t.seeding_time,
+                        total_size=t.total_size,
+                        selected_size=t.selected_size,
+                        completed=t.completed,
+                        completed_time=t.completed_time,
+                        state=t.state,
+                        tracker_status=t.tracker_status,
+                    )
+                    for t in torrents
+                ]
+        finally:
             await client.disconnect()
-            return [
-                TorrentInfo(
-                    hash=t.hash,
-                    name=t.name,
-                    size=t.size,
-                    progress=t.progress,
-                    status=t.status,
-                    uploaded=t.uploaded,
-                    downloaded=t.downloaded,
-                    ratio=t.ratio,
-                    upload_speed=t.upload_speed,
-                    download_speed=t.download_speed,
-                    seeders=t.seeders,
-                    leechers=t.leechers,
-                    seeds_connected=t.seeds_connected,
-                    peers_connected=t.peers_connected,
-                    tracker=t.tracker,
-                    tags=",".join(t.tags),
-                    category=t.category,
-                    save_path=t.save_path,
-                    added_time=t.added_time,
-                    seeding_time=t.seeding_time,
-                    total_size=t.total_size,
-                    selected_size=t.selected_size,
-                    completed=t.completed,
-                    completed_time=t.completed_time,
-                    state=t.state,
-                    tracker_status=t.tracker_status,
-                )
-                for t in torrents
-            ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -307,12 +315,16 @@ async def pause_torrent(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            success = await client.pause_torrent(torrent_hash)
+        try:
+            if await client.connect():
+                success = await client.pause_torrent(torrent_hash)
+                if success:
+                    return {"message": "Torrent paused"}
+                raise HTTPException(status_code=500, detail="Failed to pause torrent")
+        finally:
             await client.disconnect()
-            if success:
-                return {"message": "Torrent paused"}
-            raise HTTPException(status_code=500, detail="Failed to pause torrent")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -334,12 +346,16 @@ async def resume_torrent(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            success = await client.resume_torrent(torrent_hash)
+        try:
+            if await client.connect():
+                success = await client.resume_torrent(torrent_hash)
+                if success:
+                    return {"message": "Torrent resumed"}
+                raise HTTPException(status_code=500, detail="Failed to resume torrent")
+        finally:
             await client.disconnect()
-            if success:
-                return {"message": "Torrent resumed"}
-            raise HTTPException(status_code=500, detail="Failed to resume torrent")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -362,12 +378,16 @@ async def delete_torrent(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            success = await client.remove_torrent(torrent_hash, delete_files)
+        try:
+            if await client.connect():
+                success = await client.remove_torrent(torrent_hash, delete_files)
+                if success:
+                    return {"message": "Torrent deleted"}
+                raise HTTPException(status_code=500, detail="Failed to delete torrent")
+        finally:
             await client.disconnect()
-            if success:
-                return {"message": "Torrent deleted"}
-            raise HTTPException(status_code=500, detail="Failed to delete torrent")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -389,11 +409,15 @@ async def reannounce_torrent(
 
     try:
         client = create_downloader(downloader)
-        if await client.connect():
-            success = await client.reannounce_torrent(torrent_hash)
+        try:
+            if await client.connect():
+                success = await client.reannounce_torrent(torrent_hash)
+                if success:
+                    return {"message": "Torrent reannounced"}
+                raise HTTPException(status_code=500, detail="Failed to reannounce torrent")
+        finally:
             await client.disconnect()
-            if success:
-                return {"message": "Torrent reannounced"}
-            raise HTTPException(status_code=500, detail="Failed to reannounce torrent")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
