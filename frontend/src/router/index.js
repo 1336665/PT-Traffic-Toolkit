@@ -92,13 +92,18 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'Setup' })
   }
 
+  // Redirect away from setup if already initialized
+  if (authStore.initialized && to.name === 'Setup') {
+    return next({ name: authStore.isAuthenticated ? 'Dashboard' : 'Login' })
+  }
+
   // Redirect to login if not authenticated
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return next({ name: 'Login' })
   }
 
   // Redirect to dashboard if already authenticated
-  if ((to.name === 'Login' || to.name === 'Setup') && authStore.isAuthenticated) {
+  if (to.name === 'Login' && authStore.isAuthenticated) {
     return next({ name: 'Dashboard' })
   }
 

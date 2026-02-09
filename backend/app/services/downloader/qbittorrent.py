@@ -161,9 +161,10 @@ class QBittorrentClient(BaseDownloader):
         status = status_map.get(state, "error")
 
         added_on = data.get("added_on", 0)
-        added_time = datetime.fromtimestamp(added_on) if added_on else None
+        added_time = datetime.fromtimestamp(added_on) if added_on and added_on > 0 else None
         completion_on = data.get("completion_on", 0)
-        completed_time = datetime.fromtimestamp(completion_on) if completion_on else None
+        # completion_on can be -1 (not completed) or 0 (unknown)
+        completed_time = datetime.fromtimestamp(completion_on) if completion_on and completion_on > 0 else None
 
         tags = data.get("tags", "")
         tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
@@ -536,10 +537,6 @@ class QBittorrentClient(BaseDownloader):
         if first_last_priority:
             data["firstLastPiecePrio"] = "true"
 
-        # Get current torrent hashes before adding
-        existing_torrents = await self.get_torrents()
-        existing_hashes = {t.hash for t in existing_torrents}
-
         response = await self._request(
             "POST",
             "/api/v2/torrents/add",
@@ -548,7 +545,7 @@ class QBittorrentClient(BaseDownloader):
         )
 
         if response and response.text == "Ok.":
-            # If we calculated the hash, verify and return it
+            # If we calculated the hash from torrent file, verify and return it
             if expected_hash:
                 # Wait a bit for qBittorrent to process
                 await asyncio.sleep(0.5)
@@ -556,15 +553,23 @@ class QBittorrentClient(BaseDownloader):
                 if torrent_info:
                     return expected_hash
 
-            # Fallback: find new torrents by comparing hashes
+            # Fallback: check recently added torrents (sorted by added_on desc)
+            # instead of fetching ALL torrents which is very expensive
             max_retries = 5
             for _ in range(max_retries):
                 await asyncio.sleep(0.5)
-                current_torrents = await self.get_torrents()
-                new_hashes = {t.hash for t in current_torrents} - existing_hashes
-                if new_hashes:
-                    # Return the first new hash found
-                    return list(new_hashes)[0]
+                resp = await self._request(
+                    "GET",
+                    "/api/v2/torrents/info",
+                    params={"sort": "added_on", "reverse": "true", "limit": "5"}
+                )
+                if resp:
+                    try:
+                        recent = resp.json()
+                        if recent:
+                            return recent[0].get("hash")
+                    except Exception:
+                        pass
 
             logger.warning("Could not determine hash of added torrent")
             return None
@@ -642,7 +647,7 @@ class QBittorrentClient(BaseDownloader):
 
     async def get_stats(self) -> DownloaderStats:
         response = await self._request("GET", "/api/v2/transfer/info")
-        torrents = await self.get_torrents()
+        torrents = await self.get_torrents(with_reannounce=False)
 
         if not response:
             return DownloaderStats(

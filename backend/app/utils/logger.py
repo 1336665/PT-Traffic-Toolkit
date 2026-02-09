@@ -50,12 +50,17 @@ class DatabaseLogHandler(logging.Handler):
             if module == 'system' and record.name.startswith('pt_manager.'):
                 module = record.name.replace('pt_manager.', '')
 
+            details = ''
+            if record.exc_info and record.exc_info[0] is not None:
+                import traceback
+                details = ''.join(traceback.format_exception(*record.exc_info))
+
             log_entry = {
                 'timestamp': datetime.utcnow(),
                 'level': record.levelname,
                 'module': module,
                 'message': record.getMessage(),
-                'details': str(record.exc_info) if record.exc_info else ''
+                'details': details
             }
             self.log_queue.put(log_entry)
         except Exception:
