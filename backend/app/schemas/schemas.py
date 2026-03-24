@@ -305,45 +305,44 @@ class DeleteRecordResponse(BaseModel):
 
 class SpeedLimitConfigBase(BaseModel):
     enabled: bool = False
-    target_upload_speed: float = 0
-    target_download_speed: float = 0
-    safety_margin: float = 0.1
-    kp: float = 0.6
-    ki: float = 0.1
-    kd: float = 0.05
-    report_interval: int = 300
-    telegram_enabled: bool = False
+    qb_url: str = "http://localhost:8080"
+    qb_username: str = ""
+    qb_password: str = ""
+    target_tags: str = "u2"
+    target_categories: str = "u2"
+    upload_limit_bps: float = 49 * 1024 * 1024
+    report_period_seconds: int = 4500
+    recovery_delay_seconds: int = 10
+    brake_buffer_bytes: float = 5 * 1024 * 1024 * 1024
+    brake_speed_bps: float = 10 * 1024
+    progress_threshold: float = 0.8
+    avg_speed_threshold_bps: float = 49 * 1024 * 1024
+    late_stage_limit_bps: float = 30 * 1024 * 1024
+    download_brake_progress_threshold: float = 0.97
+    download_brake_speed_bps: float = 10 * 1024
 
-    @field_validator('target_upload_speed', 'target_download_speed')
+    @field_validator(
+        'upload_limit_bps', 'brake_buffer_bytes', 'brake_speed_bps',
+        'avg_speed_threshold_bps', 'late_stage_limit_bps', 'download_brake_speed_bps'
+    )
     @classmethod
-    def validate_speed(cls, v: float) -> float:
+    def validate_non_negative_float(cls, v: float) -> float:
         if v < 0:
-            raise ValueError('速度不能为负数')
-        if v > 1000000000:  # 1GB/s
-            raise ValueError('速度设置过大')
+            raise ValueError('数值不能为负数')
         return v
 
-    @field_validator('safety_margin')
+    @field_validator('report_period_seconds', 'recovery_delay_seconds')
     @classmethod
-    def validate_safety_margin(cls, v: float) -> float:
+    def validate_non_negative_int(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError('数值不能为负数')
+        return v
+
+    @field_validator('progress_threshold', 'download_brake_progress_threshold')
+    @classmethod
+    def validate_threshold(cls, v: float) -> float:
         if v < 0 or v > 1:
-            raise ValueError('安全余量必须在 0-1 之间')
-        return v
-
-    @field_validator('kp', 'ki', 'kd')
-    @classmethod
-    def validate_pid_params(cls, v: float) -> float:
-        if v < 0 or v > 10:
-            raise ValueError('PID 参数必须在 0-10 之间')
-        return v
-
-    @field_validator('report_interval')
-    @classmethod
-    def validate_report_interval(cls, v: int) -> int:
-        if v < 60:
-            raise ValueError('汇报间隔不能小于 60 秒')
-        if v > 86400:
-            raise ValueError('汇报间隔不能大于 24 小时')
+            raise ValueError('阈值必须在 0-1 之间')
         return v
 
 
@@ -354,55 +353,8 @@ class SpeedLimitConfigUpdate(SpeedLimitConfigBase):
 class SpeedLimitConfigResponse(SpeedLimitConfigBase):
     id: int
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class SpeedLimitSiteBase(BaseModel):
-    tracker_domain: str
-    enabled: bool = True
-    target_upload_speed: float = 0
-    target_download_speed: float = 0
-    safety_margin: float = 0.1
-    # 下载限速开关（防止超速）
-    limit_download_speed: bool = False
-    # 汇报优化开关
-    optimize_announce: bool = False
-    # 精准汇报时间（peer list）
-    peerlist_enabled: bool = False
-    peerlist_url_template: str = ""
-    peerlist_cookie: str = ""
-    tid_regex: str = ""
-    # peerlist时间模式: "elapsed"=已过时间, "remaining"=剩余时间
-    peerlist_time_mode: str = "elapsed"
-    # 自定义汇报间隔（秒），0表示使用tracker返回的间隔
-    custom_announce_interval: int = 0
-
-
-class SpeedLimitSiteCreate(SpeedLimitSiteBase):
-    pass
-
-
-class SpeedLimitSiteUpdate(BaseModel):
-    enabled: Optional[bool] = None
-    target_upload_speed: Optional[float] = None
-    target_download_speed: Optional[float] = None
-    safety_margin: Optional[float] = None
-    limit_download_speed: Optional[bool] = None
-    optimize_announce: Optional[bool] = None
-    peerlist_enabled: Optional[bool] = None
-    peerlist_url_template: Optional[str] = None
-    peerlist_cookie: Optional[str] = None
-    tid_regex: Optional[str] = None
-    peerlist_time_mode: Optional[str] = None
-    custom_announce_interval: Optional[int] = None
-
-
-class SpeedLimitSiteResponse(SpeedLimitSiteBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
+    safe_total_upload_per_torrent: float
+    brake_threshold_per_torrent: float
 
     class Config:
         from_attributes = True
@@ -411,10 +363,22 @@ class SpeedLimitSiteResponse(SpeedLimitSiteBase):
 class SpeedLimitRecordResponse(BaseModel):
     id: int
     tracker_domain: str
+    torrent_hash: str
+    torrent_name: str
     current_speed: float
     target_speed: float
     limit_applied: float
     phase: str
+    progress: float
+    upload_limit: float
+    download_limit: float
+    period_uploaded: float
+    period_avg_speed: float
+    period_index: int
+    matched_by_tag: bool
+    matched_by_category: bool
+    tags: str
+    category: str
     created_at: datetime
 
     class Config:

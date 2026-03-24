@@ -220,59 +220,36 @@ class SpeedLimitConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     enabled = Column(Boolean, default=False)
 
-    # Target speed (in bytes/s)
-    target_upload_speed = Column(Float, default=0)
-    target_download_speed = Column(Float, default=0)
+    qb_url = Column(String(255), default="http://localhost:8080")
+    qb_username = Column(String(100), default="")
+    qb_password = Column(String(255), default="")
 
-    # Safety margin (0-1)
-    safety_margin = Column(Float, default=0.1)
+    target_tags = Column(Text, default="u2")
+    target_categories = Column(Text, default="u2")
 
-    # PID parameters
-    kp = Column(Float, default=0.6)
-    ki = Column(Float, default=0.1)
-    kd = Column(Float, default=0.05)
+    upload_limit_bps = Column(Float, default=49 * 1024 * 1024)
+    report_period_seconds = Column(Integer, default=4500)
+    recovery_delay_seconds = Column(Integer, default=10)
 
-    # Report interval (seconds)
-    report_interval = Column(Integer, default=300)
+    brake_buffer_bytes = Column(Float, default=5 * 1024 * 1024 * 1024)
+    brake_speed_bps = Column(Float, default=10 * 1024)
 
-    # Telegram notification
-    telegram_enabled = Column(Boolean, default=False)
+    progress_threshold = Column(Float, default=0.8)
+    avg_speed_threshold_bps = Column(Float, default=49 * 1024 * 1024)
+    late_stage_limit_bps = Column(Float, default=30 * 1024 * 1024)
+
+    download_brake_progress_threshold = Column(Float, default=0.97)
+    download_brake_speed_bps = Column(Float, default=10 * 1024)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @property
+    def safe_total_upload_per_torrent(self):
+        return self.upload_limit_bps * self.report_period_seconds
 
-class SpeedLimitSite(Base):
-    __tablename__ = "speed_limit_sites"
-
-    id = Column(Integer, primary_key=True, index=True)
-    tracker_domain = Column(String(255), nullable=False, unique=True)
-    enabled = Column(Boolean, default=True)
-
-    target_upload_speed = Column(Float, default=0)  # Bytes/s
-    target_download_speed = Column(Float, default=0)
-    safety_margin = Column(Float, default=0.1)
-
-    # 下载限速开关（防止超速，参考 u2_magic.py limit_download_speed）
-    # 将两次汇报间的平均速度限制到 50M/s 以下，防止完成时汇报超速
-    limit_download_speed = Column(Boolean, default=False)
-    # 汇报优化开关（参考 u2_magic.py optimize_announce_time）
-    # 在合适的时间强制汇报来调整完成前最后一次汇报时间，最大化上传量
-    optimize_announce = Column(Boolean, default=False)
-    # ====== 精准汇报时间（参考 u2_magic.py peer list 规则）======
-    peerlist_enabled = Column(Boolean, default=False)
-    peerlist_url_template = Column(String(500), default="")
-    peerlist_cookie = Column(Text, default="")
-    tid_regex = Column(String(255), default="")
-    # peerlist返回的时间类型：
-    # "elapsed" - 已过时间（从上次汇报到现在），需要用间隔减去它得到剩余时间
-    # "remaining" - 剩余时间（距离下次汇报），直接使用
-    peerlist_time_mode = Column(String(20), default="elapsed")
-    # 自定义汇报间隔（秒），如果设置则优先使用，用于计算剩余时间
-    # 0 表示使用tracker返回的间隔
-    custom_announce_interval = Column(Integer, default=0)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    @property
+    def brake_threshold_per_torrent(self):
+        return self.safe_total_upload_per_torrent - self.brake_buffer_bytes
 
 
 class SpeedLimitRecord(Base):
@@ -281,15 +258,26 @@ class SpeedLimitRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     tracker_domain = Column(String(255), default="", index=True)
     downloader_id = Column(Integer, ForeignKey("downloaders.id"), nullable=True)
-    current_speed = Column(Float, default=0)  # Bytes/s
+    torrent_hash = Column(String(100), default="", index=True)
+    torrent_name = Column(String(500), default="")
+    current_speed = Column(Float, default=0)
     target_speed = Column(Float, default=0)
     limit_applied = Column(Float, default=0)
-    phase = Column(String(50), default="")  # warmup/catch/steady/finish
-    uploaded = Column(Float, default=0)  # Bytes uploaded this interval
-    downloaded = Column(Float, default=0)  # Bytes downloaded this interval
+    phase = Column(String(50), default="")
+    uploaded = Column(Float, default=0)
+    downloaded = Column(Float, default=0)
+    progress = Column(Float, default=0)
+    upload_limit = Column(Float, default=0)
+    download_limit = Column(Float, default=0)
+    period_uploaded = Column(Float, default=0)
+    period_avg_speed = Column(Float, default=0)
+    period_index = Column(Integer, default=0)
+    matched_by_tag = Column(Boolean, default=False)
+    matched_by_category = Column(Boolean, default=False)
+    tags = Column(Text, default="")
+    category = Column(String(100), default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
-    # Composite index for time-based queries
     __table_args__ = (
         Index('ix_speed_limit_records_created_downloader', 'created_at', 'downloader_id'),
     )

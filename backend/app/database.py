@@ -67,7 +67,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_delete_rule_columns(conn)
         await _ensure_delete_record_columns(conn)
-        await _ensure_speed_limit_site_columns(conn)
+        await _ensure_speed_limit_columns(conn)
         await _ensure_u2_magic_config_columns(conn)
 
 
@@ -81,9 +81,18 @@ _DELETE_RECORD_COLUMNS_WHITELIST = frozenset({
     "action_type"
 })
 
-_SPEED_LIMIT_SITE_COLUMNS_WHITELIST = frozenset({
-    "peerlist_enabled", "peerlist_url_template", "peerlist_cookie",
-    "tid_regex", "peerlist_time_mode", "custom_announce_interval"
+_SPEED_LIMIT_CONFIG_COLUMNS_WHITELIST = frozenset({
+    "qb_url", "qb_username", "qb_password", "target_tags", "target_categories",
+    "upload_limit_bps", "report_period_seconds", "recovery_delay_seconds",
+    "brake_buffer_bytes", "brake_speed_bps", "progress_threshold",
+    "avg_speed_threshold_bps", "late_stage_limit_bps",
+    "download_brake_progress_threshold", "download_brake_speed_bps"
+})
+
+_SPEED_LIMIT_RECORD_COLUMNS_WHITELIST = frozenset({
+    "torrent_hash", "torrent_name", "progress", "upload_limit", "download_limit",
+    "period_uploaded", "period_avg_speed", "period_index", "matched_by_tag",
+    "matched_by_category", "tags", "category"
 })
 
 _U2_MAGIC_CONFIG_COLUMNS_WHITELIST = frozenset({
@@ -127,26 +136,57 @@ async def _ensure_delete_record_columns(conn):
         if name not in existing:
             await conn.exec_driver_sql(f"ALTER TABLE delete_records ADD COLUMN {name} {ddl}")
 
-async def _ensure_speed_limit_site_columns(conn):
-    """Ensure speed_limit_sites table has new peer list columns."""
+async def _ensure_speed_limit_columns(conn):
+    """Ensure speed_limit_config and speed_limit_records tables have v2 columns."""
     if conn.dialect.name != "sqlite":
         return
-    result = await conn.exec_driver_sql("PRAGMA table_info(speed_limit_sites)")
+
+    result = await conn.exec_driver_sql("PRAGMA table_info(speed_limit_config)")
     existing = {row[1] for row in result.fetchall()}
-    columns = {
-        "peerlist_enabled": "BOOLEAN DEFAULT 0",
-        "peerlist_url_template": "VARCHAR(500) DEFAULT ''",
-        "peerlist_cookie": "TEXT DEFAULT ''",
-        "tid_regex": "VARCHAR(255) DEFAULT ''",
-        "peerlist_time_mode": "VARCHAR(20) DEFAULT 'elapsed'",
-        "custom_announce_interval": "INTEGER DEFAULT 0",
+    config_columns = {
+        "qb_url": "VARCHAR(255) DEFAULT 'http://localhost:8080'",
+        "qb_username": "VARCHAR(100) DEFAULT ''",
+        "qb_password": "VARCHAR(255) DEFAULT ''",
+        "target_tags": "TEXT DEFAULT 'u2'",
+        "target_categories": "TEXT DEFAULT 'u2'",
+        "upload_limit_bps": "FLOAT DEFAULT 51380224",
+        "report_period_seconds": "INTEGER DEFAULT 4500",
+        "recovery_delay_seconds": "INTEGER DEFAULT 10",
+        "brake_buffer_bytes": "FLOAT DEFAULT 5368709120",
+        "brake_speed_bps": "FLOAT DEFAULT 10240",
+        "progress_threshold": "FLOAT DEFAULT 0.8",
+        "avg_speed_threshold_bps": "FLOAT DEFAULT 51380224",
+        "late_stage_limit_bps": "FLOAT DEFAULT 31457280",
+        "download_brake_progress_threshold": "FLOAT DEFAULT 0.97",
+        "download_brake_speed_bps": "FLOAT DEFAULT 10240",
     }
-    for name, ddl in columns.items():
-        # Security: Validate column name against whitelist
-        if name not in _SPEED_LIMIT_SITE_COLUMNS_WHITELIST:
+    for name, ddl in config_columns.items():
+        if name not in _SPEED_LIMIT_CONFIG_COLUMNS_WHITELIST:
             raise ValueError(f"Column name '{name}' not in whitelist")
         if name not in existing:
-            await conn.exec_driver_sql(f"ALTER TABLE speed_limit_sites ADD COLUMN {name} {ddl}")
+            await conn.exec_driver_sql(f"ALTER TABLE speed_limit_config ADD COLUMN {name} {ddl}")
+
+    result = await conn.exec_driver_sql("PRAGMA table_info(speed_limit_records)")
+    existing = {row[1] for row in result.fetchall()}
+    record_columns = {
+        "torrent_hash": "VARCHAR(100) DEFAULT ''",
+        "torrent_name": "VARCHAR(500) DEFAULT ''",
+        "progress": "FLOAT DEFAULT 0",
+        "upload_limit": "FLOAT DEFAULT 0",
+        "download_limit": "FLOAT DEFAULT 0",
+        "period_uploaded": "FLOAT DEFAULT 0",
+        "period_avg_speed": "FLOAT DEFAULT 0",
+        "period_index": "INTEGER DEFAULT 0",
+        "matched_by_tag": "BOOLEAN DEFAULT 0",
+        "matched_by_category": "BOOLEAN DEFAULT 0",
+        "tags": "TEXT DEFAULT ''",
+        "category": "VARCHAR(100) DEFAULT ''",
+    }
+    for name, ddl in record_columns.items():
+        if name not in _SPEED_LIMIT_RECORD_COLUMNS_WHITELIST:
+            raise ValueError(f"Column name '{name}' not in whitelist")
+        if name not in existing:
+            await conn.exec_driver_sql(f"ALTER TABLE speed_limit_records ADD COLUMN {name} {ddl}")
 
 
 async def _ensure_u2_magic_config_columns(conn):
@@ -171,7 +211,7 @@ def init_sync_db():
     Base.metadata.create_all(bind=sync_engine)
     _ensure_delete_rule_columns_sync()
     _ensure_delete_record_columns_sync()
-    _ensure_speed_limit_site_columns_sync()
+    _ensure_speed_limit_columns_sync()
     _ensure_u2_magic_config_columns_sync()
 
 
@@ -211,26 +251,56 @@ def _ensure_delete_record_columns_sync():
             if name not in existing:
                 conn.exec_driver_sql(f"ALTER TABLE delete_records ADD COLUMN {name} {ddl}")
 
-def _ensure_speed_limit_site_columns_sync():
+def _ensure_speed_limit_columns_sync():
     if sync_engine.dialect.name != "sqlite":
         return
     with sync_engine.begin() as conn:
-        result = conn.exec_driver_sql("PRAGMA table_info(speed_limit_sites)")
+        result = conn.exec_driver_sql("PRAGMA table_info(speed_limit_config)")
         existing = {row[1] for row in result.fetchall()}
-        columns = {
-            "peerlist_enabled": "BOOLEAN DEFAULT 0",
-            "peerlist_url_template": "VARCHAR(500) DEFAULT ''",
-            "peerlist_cookie": "TEXT DEFAULT ''",
-            "tid_regex": "VARCHAR(255) DEFAULT ''",
-            "peerlist_time_mode": "VARCHAR(20) DEFAULT 'elapsed'",
-            "custom_announce_interval": "INTEGER DEFAULT 0",
+        config_columns = {
+            "qb_url": "VARCHAR(255) DEFAULT 'http://localhost:8080'",
+            "qb_username": "VARCHAR(100) DEFAULT ''",
+            "qb_password": "VARCHAR(255) DEFAULT ''",
+            "target_tags": "TEXT DEFAULT 'u2'",
+            "target_categories": "TEXT DEFAULT 'u2'",
+            "upload_limit_bps": "FLOAT DEFAULT 51380224",
+            "report_period_seconds": "INTEGER DEFAULT 4500",
+            "recovery_delay_seconds": "INTEGER DEFAULT 10",
+            "brake_buffer_bytes": "FLOAT DEFAULT 5368709120",
+            "brake_speed_bps": "FLOAT DEFAULT 10240",
+            "progress_threshold": "FLOAT DEFAULT 0.8",
+            "avg_speed_threshold_bps": "FLOAT DEFAULT 51380224",
+            "late_stage_limit_bps": "FLOAT DEFAULT 31457280",
+            "download_brake_progress_threshold": "FLOAT DEFAULT 0.97",
+            "download_brake_speed_bps": "FLOAT DEFAULT 10240",
         }
-        for name, ddl in columns.items():
-            # Security: Validate column name against whitelist
-            if name not in _SPEED_LIMIT_SITE_COLUMNS_WHITELIST:
+        for name, ddl in config_columns.items():
+            if name not in _SPEED_LIMIT_CONFIG_COLUMNS_WHITELIST:
                 raise ValueError(f"Column name '{name}' not in whitelist")
             if name not in existing:
-                conn.exec_driver_sql(f"ALTER TABLE speed_limit_sites ADD COLUMN {name} {ddl}")
+                conn.exec_driver_sql(f"ALTER TABLE speed_limit_config ADD COLUMN {name} {ddl}")
+
+        result = conn.exec_driver_sql("PRAGMA table_info(speed_limit_records)")
+        existing = {row[1] for row in result.fetchall()}
+        record_columns = {
+            "torrent_hash": "VARCHAR(100) DEFAULT ''",
+            "torrent_name": "VARCHAR(500) DEFAULT ''",
+            "progress": "FLOAT DEFAULT 0",
+            "upload_limit": "FLOAT DEFAULT 0",
+            "download_limit": "FLOAT DEFAULT 0",
+            "period_uploaded": "FLOAT DEFAULT 0",
+            "period_avg_speed": "FLOAT DEFAULT 0",
+            "period_index": "INTEGER DEFAULT 0",
+            "matched_by_tag": "BOOLEAN DEFAULT 0",
+            "matched_by_category": "BOOLEAN DEFAULT 0",
+            "tags": "TEXT DEFAULT ''",
+            "category": "VARCHAR(100) DEFAULT ''",
+        }
+        for name, ddl in record_columns.items():
+            if name not in _SPEED_LIMIT_RECORD_COLUMNS_WHITELIST:
+                raise ValueError(f"Column name '{name}' not in whitelist")
+            if name not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE speed_limit_records ADD COLUMN {name} {ddl}")
 
 
 def _ensure_u2_magic_config_columns_sync():

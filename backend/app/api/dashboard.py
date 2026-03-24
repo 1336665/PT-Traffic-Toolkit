@@ -286,7 +286,7 @@ async def get_services_status(
     return {
         "speed_limit": {
             "enabled": speed_config.enabled if speed_config else False,
-            "target_speed": speed_config.target_upload_speed if speed_config else 0,
+            "target_speed": speed_config.upload_limit_bps if speed_config else 0,
         },
         "u2_magic": {
             "enabled": u2_config.enabled if u2_config else False,
