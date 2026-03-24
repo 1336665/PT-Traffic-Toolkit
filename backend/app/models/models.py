@@ -223,6 +223,7 @@ class SpeedLimitConfig(Base):
     qb_url = Column(String(255), default="http://localhost:8080")
     qb_username = Column(String(100), default="")
     qb_password = Column(String(255), default="")
+    downloader_ids = Column(Text, default="")
 
     target_tags = Column(Text, default="u2")
     target_categories = Column(Text, default="u2")
@@ -318,6 +319,9 @@ class U2MagicConfig(Base):
     da_qiao = Column(Boolean, default=True)  # 搭桥功能
     min_add_interval = Column(Integer, default=0)  # 重复添加最小间隔（秒）
     name_filter = Column(Text, default="")  # 名称过滤关键词
+    re_download = Column(Boolean, default=False)  # 是否允许重复推送
+    checked_cache_size = Column(Integer, default=2000)  # checked 记忆队列长度
+    qb_tag = Column(String(100), default="u2")  # 推送到 qB 的标签
 
     # Downloader (支持单选，保持向后兼容)
     downloader_id = Column(Integer, ForeignKey("downloaders.id"), nullable=True)

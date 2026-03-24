@@ -308,6 +308,7 @@ class SpeedLimitConfigBase(BaseModel):
     qb_url: str = "http://localhost:8080"
     qb_username: str = ""
     qb_password: str = ""
+    downloader_ids: str = ""
     target_tags: str = "u2"
     target_categories: str = "u2"
     upload_limit_bps: float = 49 * 1024 * 1024
@@ -409,6 +410,9 @@ class U2MagicConfigBase(BaseModel):
     da_qiao: bool = True
     min_add_interval: int = 0
     name_filter: str = ""
+    re_download: bool = False
+    checked_cache_size: int = 2000
+    qb_tag: str = "u2"
     downloader_id: Optional[int] = None
     downloader_ids: str = ""  # JSON数组格式，如 "[1,2,3]"，支持多选下载器
 

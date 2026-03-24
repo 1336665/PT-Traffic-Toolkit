@@ -82,7 +82,7 @@ _DELETE_RECORD_COLUMNS_WHITELIST = frozenset({
 })
 
 _SPEED_LIMIT_CONFIG_COLUMNS_WHITELIST = frozenset({
-    "qb_url", "qb_username", "qb_password", "target_tags", "target_categories",
+    "qb_url", "qb_username", "qb_password", "downloader_ids", "target_tags", "target_categories",
     "upload_limit_bps", "report_period_seconds", "recovery_delay_seconds",
     "brake_buffer_bytes", "brake_speed_bps", "progress_threshold",
     "avg_speed_threshold_bps", "late_stage_limit_bps",
@@ -96,7 +96,7 @@ _SPEED_LIMIT_RECORD_COLUMNS_WHITELIST = frozenset({
 })
 
 _U2_MAGIC_CONFIG_COLUMNS_WHITELIST = frozenset({
-    "downloader_ids"
+    "downloader_ids", "re_download", "checked_cache_size", "qb_tag"
 })
 
 
@@ -147,6 +147,7 @@ async def _ensure_speed_limit_columns(conn):
         "qb_url": "VARCHAR(255) DEFAULT 'http://localhost:8080'",
         "qb_username": "VARCHAR(100) DEFAULT ''",
         "qb_password": "VARCHAR(255) DEFAULT ''",
+        "downloader_ids": "TEXT DEFAULT ''",
         "target_tags": "TEXT DEFAULT 'u2'",
         "target_categories": "TEXT DEFAULT 'u2'",
         "upload_limit_bps": "FLOAT DEFAULT 51380224",
@@ -197,6 +198,9 @@ async def _ensure_u2_magic_config_columns(conn):
     existing = {row[1] for row in result.fetchall()}
     columns = {
         "downloader_ids": "TEXT DEFAULT ''",
+        "re_download": "BOOLEAN DEFAULT 0",
+        "checked_cache_size": "INTEGER DEFAULT 2000",
+        "qb_tag": "VARCHAR(100) DEFAULT 'u2'",
     }
     for name, ddl in columns.items():
         # Security: Validate column name against whitelist
@@ -261,6 +265,7 @@ def _ensure_speed_limit_columns_sync():
             "qb_url": "VARCHAR(255) DEFAULT 'http://localhost:8080'",
             "qb_username": "VARCHAR(100) DEFAULT ''",
             "qb_password": "VARCHAR(255) DEFAULT ''",
+            "downloader_ids": "TEXT DEFAULT ''",
             "target_tags": "TEXT DEFAULT 'u2'",
             "target_categories": "TEXT DEFAULT 'u2'",
             "upload_limit_bps": "FLOAT DEFAULT 51380224",
@@ -311,6 +316,9 @@ def _ensure_u2_magic_config_columns_sync():
         existing = {row[1] for row in result.fetchall()}
         columns = {
             "downloader_ids": "TEXT DEFAULT ''",
+            "re_download": "BOOLEAN DEFAULT 0",
+            "checked_cache_size": "INTEGER DEFAULT 2000",
+            "qb_tag": "VARCHAR(100) DEFAULT 'u2'",
         }
         for name, ddl in columns.items():
             # Security: Validate column name against whitelist

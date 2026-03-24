@@ -130,23 +130,37 @@
             </div>
           </div>
 
-          <!-- 目录配置 -->
+          <!-- 下载器与推送配置 -->
           <div>
             <h4 class="text-sm font-medium text-surface-900 dark:text-white mb-3 flex items-center">
               <FolderIcon class="w-4 h-4 mr-2 text-blue-500" />
-              目录配置
+              下载器与推送配置
             </h4>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div class="form-group">
-                <label class="form-label">种子备份目录</label>
-                <input v-model="config.backup_dir" type="text" class="form-input" placeholder="/path/to/backup" />
+                <label class="form-label">qB 标签</label>
+                <input v-model="config.qb_tag" type="text" class="form-input" placeholder="u2" />
+                <p class="text-xs text-surface-500 mt-1">推送到下载器时自动附加的标签</p>
               </div>
               <div class="form-group">
-                <label class="form-label">监控目录</label>
-                <input v-model="config.watch_dir" type="text" class="form-input" placeholder="/path/to/watch" />
+                <label class="form-label">记忆容量</label>
+                <input v-model.number="config.checked_cache_size" type="number" min="2000" class="form-input" />
+                <p class="text-xs text-surface-500 mt-1">默认 2000，防止老种子被遗忘导致重复抓取</p>
+              </div>
+              <div class="form-group lg:col-span-2">
+                <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700">
+                  <p class="text-sm font-medium text-surface-900 dark:text-white">推送方式</p>
+                  <p class="text-xs text-surface-500 dark:text-surface-400 mt-1">当前版本已按新逻辑改为：发现符合条件的种子后，直接推送到所选下载器，不再依赖监控目录中转。</p>
+                </div>
               </div>
               <div class="lg:col-span-2 form-group">
-                <label class="form-label">下载器（多选，按空间智能分配）</label>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="form-label mb-0">下载器（多选，按空间智能分配）</label>
+                  <div class="flex items-center gap-2">
+                    <button type="button" class="text-xs px-2 py-1 rounded-lg border border-surface-200 dark:border-surface-700 hover:bg-surface-100 dark:hover:bg-surface-700" @click="selectedDownloaderIds = downloaders.map(dl => dl.id)">全选</button>
+                    <button type="button" class="text-xs px-2 py-1 rounded-lg border border-surface-200 dark:border-surface-700 hover:bg-surface-100 dark:hover:bg-surface-700" @click="selectedDownloaderIds = []">清空</button>
+                  </div>
+                </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   <label
                     v-for="dl in downloaders"
@@ -162,7 +176,10 @@
                       v-model="selectedDownloaderIds"
                       class="rounded text-purple-600 focus:ring-purple-500"
                     />
-                    <span class="text-sm truncate" :class="selectedDownloaderIds.includes(dl.id) ? 'text-purple-700 dark:text-purple-300 font-medium' : 'text-surface-700 dark:text-surface-300'">{{ dl.name }}</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm truncate" :class="selectedDownloaderIds.includes(dl.id) ? 'text-purple-700 dark:text-purple-300 font-medium' : 'text-surface-700 dark:text-surface-300'">{{ dl.name }}</div>
+                      <div class="text-[11px] text-surface-400 truncate">{{ dl.type }} · {{ dl.enabled ? '已启用' : '已禁用' }}</div>
+                    </div>
                   </label>
                 </div>
                 <p v-if="downloaders.length === 0" class="text-sm text-surface-400 mt-2">暂无下载器，请先添加</p>
@@ -208,7 +225,7 @@
               <div class="form-group">
                 <label class="form-label">重复添加间隔 (秒)</label>
                 <input v-model.number="config.min_add_interval" type="number" min="0" class="form-input" />
-                <p class="text-xs text-surface-500 mt-1">0 = 不重复添加</p>
+                <p class="text-xs text-surface-500 mt-1">仅在允许重复推送时生效</p>
               </div>
               <div class="lg:col-span-2 form-group">
                 <label class="form-label">分类过滤</label>
@@ -223,6 +240,15 @@
 
           <!-- 高级选项 -->
           <div>
+            <div class="mb-4 p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-900/20">
+              <p class="text-sm font-medium text-blue-800 dark:text-blue-300">当前逻辑说明</p>
+              <ul class="mt-2 space-y-1 text-xs text-blue-700 dark:text-blue-400">
+                <li>• 失效种子会安全跳过并记录，不再导致整轮回滚</li>
+                <li>• 默认关闭重复推送</li>
+                <li>• 命中后会直接推送到所选下载器，并自动打上 qB 标签</li>
+                <li>• 多下载器模式下，会根据种子大小和剩余空间自动分配</li>
+              </ul>
+            </div>
             <h4 class="text-sm font-medium text-surface-900 dark:text-white mb-3 flex items-center">
               <AdjustmentsHorizontalIcon class="w-4 h-4 mr-2 text-surface-500" />
               高级选项
@@ -268,6 +294,13 @@
                 <div>
                   <span class="text-sm font-medium text-surface-900 dark:text-white">搭桥模式</span>
                   <p class="text-xs text-surface-500">帮助下载传输</p>
+                </div>
+              </label>
+              <label class="flex items-center space-x-3 p-3 rounded-xl bg-surface-50 dark:bg-surface-700/50 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors">
+                <input v-model="config.re_download" type="checkbox" class="rounded text-purple-600 focus:ring-purple-500" />
+                <div>
+                  <span class="text-sm font-medium text-surface-900 dark:text-white">允许重复推送</span>
+                  <p class="text-xs text-surface-500">默认关闭，避免同种子反复推送</p>
                 </div>
               </label>
             </div>
@@ -487,8 +520,11 @@ const config = reactive({
   min_add_interval: 0,
   categories: '',
   name_filter: '',
+  re_download: false,
+  checked_cache_size: 2000,
+  qb_tag: 'u2',
   downloader_id: null,
-  downloader_ids: '',  // JSON数组格式
+  downloader_ids: '',
 })
 
 const records = ref([])

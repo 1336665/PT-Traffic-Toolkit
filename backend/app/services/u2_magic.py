@@ -71,12 +71,19 @@ class U2MagicService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.checked: deque = deque(maxlen=200)  # 已检查的魔法ID
+        self.checked: deque = deque(maxlen=2000)  # 已检查的魔法ID
         self.magic_id_0: Optional[int] = None    # 最新魔法ID
         # Use OrderedDict with size limit to prevent memory leak
         self._tid_add_time: OrderedDict[str, float] = OrderedDict()
         self.first_time = True
         self._http_client: Optional[httpx.AsyncClient] = None
+
+    def _get_checked_cache_size(self, config: Optional[U2MagicConfig] = None) -> int:
+        value = getattr(config, 'checked_cache_size', 2000) if config else 2000
+        try:
+            return max(2000, int(value))
+        except (TypeError, ValueError):
+            return 2000
 
     @property
     def tid_add_time(self) -> OrderedDict[str, float]:
@@ -129,7 +136,8 @@ class U2MagicService:
             setting = result.scalar_one_or_none()
             if setting and setting.value:
                 data = json.loads(setting.value)
-                self.checked = deque(data.get('checked', []), maxlen=200)
+                cache_size = data.get('checked_cache_size', 2000)
+                self.checked = deque(data.get('checked', []), maxlen=cache_size)
                 self.magic_id_0 = data.get('id_0')
                 self.tid_add_time = data.get('add_time', {})
                 logger.info(f"已加载U2追魔状态: {len(self.checked)} 条记录")
@@ -143,6 +151,7 @@ class U2MagicService:
                 'checked': list(self.checked),
                 'id_0': self.magic_id_0,
                 'add_time': self.tid_add_time,
+                'checked_cache_size': self.checked.maxlen or 2000,
             })
 
             result = await self.db.execute(
@@ -488,11 +497,21 @@ class U2MagicService:
 
         soup = self._get_soup(html)
 
-        # 检查种子是否存在
+        # 检查种子是否存在/是否有权限访问：安全跳过，不抛异常，不触发整轮回滚
         index_links = soup.select('a.index')
         if len(index_links) < 2:
-            logger.debug(f"种子 {tid} 已删除")
-            return None
+            page_title = soup.title.string if soup.title else '未知标题'
+            logger.warning(f"种子 {tid} 详情不存在或无法访问，已跳过。页面标题: [{page_title}]")
+            return {
+                'magic_id': magic_id,
+                'tid': tid,
+                'name': f'torrent_{tid}',
+                'download_link': '',
+                'seeders': 0,
+                'size': 0,
+                'deleted_or_inaccessible': True,
+                'skip_reason': '种子详情不存在或无权限访问',
+            }
 
         torrent_name = index_links[0].text[5:-8] if index_links[0].text else f"torrent_{tid}"
         download_link = f"{self.BASE_URL}/{index_links[1].get('href', '')}"
@@ -686,9 +705,13 @@ class U2MagicService:
         config: U2MagicConfig
     ) -> Optional[bytes]:
         """下载种子文件"""
-        # 检查重复下载间隔
+        # 检查重复下载间隔 / 默认禁止重复推送
         min_add_interval = config.min_add_interval if hasattr(config, 'min_add_interval') else 0
+        allow_re_download = bool(getattr(config, 're_download', False))
         if tid in self.tid_add_time:
+            if not allow_re_download:
+                logger.info(f"种子 {tid} 已推送过，按 re_download=False 跳过")
+                return None
             if time() - self.tid_add_time[tid] < min_add_interval:
                 logger.info(f"种子 {tid} 重复下载间隔不足")
                 return None
@@ -833,22 +856,11 @@ class U2MagicService:
         Returns:
             是否成功添加
         """
-        # 解析下载器ID列表
+        # 解析下载器ID列表：按脚本思路，直接推送到下载器；不再回退到监控目录中转
         downloader_ids = self._parse_downloader_ids(config)
 
         if not downloader_ids:
-            # 保存到监控目录
-            if config.watch_dir:
-                try:
-                    import hashlib
-                    hash_name = hashlib.md5(torrent_data[:1024]).hexdigest()[:8]
-                    path = os.path.join(config.watch_dir, f"u2_{hash_name}.torrent")
-                    os.makedirs(config.watch_dir, exist_ok=True)
-                    with open(path, 'wb') as f:
-                        f.write(torrent_data)
-                    return True
-                except Exception as e:
-                    logger.error(f"保存到监控目录失败: {e}")
+            logger.error("未选择可用下载器，无法直接推送种子")
             return False
 
         # 选择最佳下载器
@@ -862,9 +874,13 @@ class U2MagicService:
                 if not client:
                     return False
 
+                qb_tag = (getattr(config, 'qb_tag', 'u2') or 'u2').strip()
+                tags = [qb_tag] if qb_tag else None
                 torrent_hash = await client.add_torrent(
                     torrent_data,
                     save_path=downloader.download_dir if downloader.download_dir else None,
+                    tags=tags,
+                    paused=False,
                 )
 
                 if torrent_hash:
@@ -902,6 +918,7 @@ class U2MagicService:
 
         # 加载状态
         await self.load_state()
+        self.checked = deque(list(self.checked), maxlen=self._get_checked_cache_size(config))
 
         # 获取魔法列表（优先API）
         magic_list = []
@@ -940,7 +957,19 @@ class U2MagicService:
                 info = await self.analyze_magic(magic_id, tid, config)
 
                 if info:
-                    # 下载种子
+                    if info.get('deleted_or_inaccessible'):
+                        self.db.add(U2MagicRecord(
+                            torrent_id=str(tid),
+                            torrent_name=info.get('name', f'torrent_{tid}'),
+                            magic_type=info.get('magic_type', ''),
+                            seeders=0,
+                            size=0,
+                            downloaded=False,
+                            skip_reason=info.get('skip_reason', '种子详情不存在或无权限访问'),
+                        ))
+                        self.checked.append(magic_id)
+                        continue
+
                     torrent_data = await self.download_torrent(
                         info['download_link'],
                         str(tid),
@@ -948,19 +977,15 @@ class U2MagicService:
                     )
 
                     if torrent_data:
-                        # 备份
                         if config.backup_dir:
                             await self.backup_torrent(torrent_data, str(tid), config.backup_dir)
 
-                        # 添加到下载器（传递种子大小用于智能分配）
                         torrent_size = info.get('size', 0)
                         success = await self.add_to_downloader(torrent_data, config, torrent_size)
 
                         if success:
                             downloaded += 1
                             logger.info(f"下载种子 {tid}: {info['name'][:50]}")
-
-                            # 创建记录
                             record = U2MagicRecord(
                                 torrent_id=str(tid),
                                 torrent_name=info['name'],
@@ -972,7 +997,7 @@ class U2MagicService:
                             )
                             self.db.add(record)
                         else:
-                            record = U2MagicRecord(
+                            self.db.add(U2MagicRecord(
                                 torrent_id=str(tid),
                                 torrent_name=info['name'],
                                 magic_type=info.get('magic_type', ''),
@@ -980,10 +1005,9 @@ class U2MagicService:
                                 size=info.get('size', 0),
                                 downloaded=False,
                                 skip_reason="添加到下载器失败",
-                            )
-                            self.db.add(record)
+                            ))
                     else:
-                        record = U2MagicRecord(
+                        self.db.add(U2MagicRecord(
                             torrent_id=str(tid),
                             torrent_name=info['name'],
                             magic_type=info.get('magic_type', ''),
@@ -991,8 +1015,7 @@ class U2MagicService:
                             size=info.get('size', 0),
                             downloaded=False,
                             skip_reason="下载种子文件失败",
-                        )
-                        self.db.add(record)
+                        ))
 
                 self.checked.append(magic_id)
 
