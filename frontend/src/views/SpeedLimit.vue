@@ -1,182 +1,298 @@
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h2 class="text-xl font-bold text-surface-900 dark:text-white">动态限速重构版</h2>
-        <p class="text-sm text-surface-500 dark:text-surface-400">按周期、按标签/分类管理种子的上传与下载刹车</p>
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30">
+          <BoltIcon class="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-surface-900 dark:text-white">动态限速</h2>
+          <p class="text-sm text-surface-500 dark:text-surface-400">单种子独立周期控制 · 标签/分类命中后自动接管</p>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm" :class="config.enabled ? 'text-green-600 dark:text-green-400' : 'text-surface-500 dark:text-surface-400'">
+      <div class="flex items-center gap-3">
+        <span class="text-sm font-medium" :class="config.enabled ? 'text-green-600 dark:text-green-400' : 'text-surface-500 dark:text-surface-400'">
           {{ config.enabled ? '已启用' : '已禁用' }}
         </span>
         <button
           @click="toggleEnabled"
           :class="[
-            'relative inline-flex h-6 w-11 rounded-full transition-colors',
-            config.enabled ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
+            'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
+            config.enabled ? 'bg-primary-600' : 'bg-surface-200 dark:bg-surface-600'
           ]"
         >
-          <span :class="['inline-block h-5 w-5 rounded-full bg-white transition-transform mt-0.5', config.enabled ? 'translate-x-5' : 'translate-x-0.5']"></span>
+          <span
+            :class="[
+              'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+              config.enabled ? 'translate-x-5' : 'translate-x-0'
+            ]"
+          />
         </button>
       </div>
     </div>
 
-    <Card>
-      <template #header>
-        <div>
-          <h3 class="font-semibold text-surface-900 dark:text-white">策略说明</h3>
-          <p class="text-xs text-surface-500 dark:text-surface-400">这部分直接对应你给的脚本逻辑</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card :padding="false">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <ShieldCheckIcon class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span class="text-xs text-blue-600 dark:text-blue-400 font-medium">单种安全上传</span>
+          </div>
+          <p class="text-2xl font-bold text-surface-900 dark:text-white">{{ formatBytes(config.safe_total_upload_per_torrent || 0) }}</p>
+          <p class="text-xs text-surface-500 dark:text-surface-400 mt-2">基础安全均速 × 周期秒数</p>
         </div>
-      </template>
-      <div class="space-y-2 text-sm text-surface-700 dark:text-surface-300">
-        <div>1. 命中标签 <b>或</b> 分类的种子才纳入管理。</div>
-        <div>2. 本周期上传量达到刹车阈值后，立刻上传硬刹车。</div>
-        <div>3. 周期结束并经过恢复延迟后，自动解除所有限制进入下一周期。</div>
-        <div>4. 进度达到上传阈值后，若周期均速超标则上传压制。</div>
-        <div>5. 进度达到下载阈值后，若周期均速仍超标则下载刹车，并锁定到周期结束。</div>
-      </div>
-    </Card>
-
-    <Card>
-      <template #header>
-        <div>
-          <h3 class="font-semibold text-surface-900 dark:text-white">参数配置</h3>
-          <p class="text-xs text-surface-500 dark:text-surface-400">全部参数都可视化输入</p>
-        </div>
-      </template>
-      <form class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" @submit.prevent="saveConfig">
-        <div>
-          <label class="form-label">qB 地址</label>
-          <input v-model="config.qb_url" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">qB 用户名</label>
-          <input v-model="config.qb_username" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">qB 密码</label>
-          <input v-model="config.qb_password" type="password" class="form-input" />
-        </div>
-
-        <div>
-          <label class="form-label">目标标签（逗号分隔）</label>
-          <input v-model="config.target_tags" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">目标分类（逗号分隔）</label>
-          <input v-model="config.target_categories" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">周期秒数</label>
-          <input v-model.number="config.report_period_seconds" type="number" class="form-input" />
-        </div>
-
-        <div>
-          <label class="form-label">恢复延迟秒数</label>
-          <input v-model.number="config.recovery_delay_seconds" type="number" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">基础安全均速 (B/s)</label>
-          <input v-model.number="config.upload_limit_bps" type="number" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">周期均速阈值 (B/s)</label>
-          <input v-model.number="config.avg_speed_threshold_bps" type="number" class="form-input" />
-        </div>
-
-        <div>
-          <label class="form-label">刹车缓冲 (Bytes)</label>
-          <input v-model.number="config.brake_buffer_bytes" type="number" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">上传刹车速度 (B/s)</label>
-          <input v-model.number="config.brake_speed_bps" type="number" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">上传压制进度阈值 (0-1)</label>
-          <input v-model.number="config.progress_threshold" type="number" step="0.01" class="form-input" />
-        </div>
-
-        <div>
-          <label class="form-label">上传压制速度 (B/s)</label>
-          <input v-model.number="config.late_stage_limit_bps" type="number" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">下载刹车进度阈值 (0-1)</label>
-          <input v-model.number="config.download_brake_progress_threshold" type="number" step="0.01" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">下载刹车速度 (B/s)</label>
-          <input v-model.number="config.download_brake_speed_bps" type="number" class="form-input" />
-        </div>
-
-        <div class="md:col-span-2 xl:col-span-3 flex justify-end gap-2">
-          <Button variant="secondary" type="button" @click="loadStatus">刷新状态</Button>
-          <Button variant="secondary" type="button" @click="clearLimits" :loading="clearing">清除限制</Button>
-          <Button variant="secondary" type="button" @click="applyLimits" :loading="applying">立即应用</Button>
-          <Button variant="primary" type="submit" :loading="saving">保存配置</Button>
-        </div>
-      </form>
-    </Card>
-
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <Card>
-        <div class="text-sm text-surface-500 dark:text-surface-400">安全总流量/种</div>
-        <div class="mt-2 text-lg font-semibold text-surface-900 dark:text-white">{{ formatBytes(config.safe_total_upload_per_torrent || 0) }}</div>
       </Card>
-      <Card>
-        <div class="text-sm text-surface-500 dark:text-surface-400">刹车阈值/种</div>
-        <div class="mt-2 text-lg font-semibold text-surface-900 dark:text-white">{{ formatBytes(config.brake_threshold_per_torrent || 0) }}</div>
+
+      <Card :padding="false">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+              <HandRaisedIcon class="w-5 h-5 text-red-600 dark:text-red-400" />
+            </div>
+            <span class="text-xs text-red-600 dark:text-red-400 font-medium">绝对刹车阈值</span>
+          </div>
+          <p class="text-2xl font-bold text-surface-900 dark:text-white">{{ formatBytes(config.brake_threshold_per_torrent || 0) }}</p>
+          <p class="text-xs text-surface-500 dark:text-surface-400 mt-2">到线立刻硬刹车</p>
+        </div>
       </Card>
-      <Card>
-        <div class="text-sm text-surface-500 dark:text-surface-400">管理中的种子</div>
-        <div class="mt-2 text-lg font-semibold text-surface-900 dark:text-white">{{ Object.keys(status).length }}</div>
+
+      <Card :padding="false">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <BoltIcon class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">当前管理对象</span>
+          </div>
+          <p class="text-2xl font-bold text-surface-900 dark:text-white">{{ Object.keys(status).length }}</p>
+          <p class="text-xs text-surface-500 dark:text-surface-400 mt-2">命中标签或分类的种子</p>
+        </div>
       </Card>
-      <Card>
-        <div class="text-sm text-surface-500 dark:text-surface-400">最后刷新</div>
-        <div class="mt-2 text-lg font-semibold text-surface-900 dark:text-white">{{ lastRefresh || '--' }}</div>
+
+      <Card :padding="false">
+        <div class="p-4 flex flex-col justify-between h-full">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                <ClockIcon class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">最后刷新</span>
+            </div>
+            <p class="text-2xl font-bold text-surface-900 dark:text-white">{{ lastRefresh || '--:--:--' }}</p>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <Button variant="secondary" size="sm" @click="clearLimits" :loading="clearing" class="flex-1">
+              清除
+            </Button>
+            <Button variant="primary" size="sm" @click="applyLimits" :loading="applying" class="flex-1">
+              应用
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
 
-    <Card>
+    <Card :padding="false">
       <template #header>
-        <div>
-          <h3 class="font-semibold text-surface-900 dark:text-white">当前管理对象</h3>
-          <p class="text-xs text-surface-500 dark:text-surface-400">所有状态均可视化展示</p>
+        <div class="flex items-center space-x-3">
+          <div class="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+            <SparklesIcon class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h3 class="font-semibold text-surface-900 dark:text-white">策略说明</h3>
+            <p class="text-xs text-surface-500 dark:text-surface-400">严格按你给的脚本逻辑实现</p>
+          </div>
         </div>
       </template>
-      <div v-if="Object.keys(status).length === 0" class="text-sm text-surface-500 dark:text-surface-400 py-6 text-center">
-        当前没有命中标签/分类的种子
+      <div class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 text-sm">
+        <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+          <div class="font-medium text-surface-900 dark:text-white">对象过滤</div>
+          <div class="text-surface-500 dark:text-surface-400 mt-1">命中标签 OR 分类即纳入管理</div>
+        </div>
+        <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+          <div class="font-medium text-surface-900 dark:text-white">全局监控</div>
+          <div class="text-surface-500 dark:text-surface-400 mt-1">本周期上传到阈值立刻硬刹车</div>
+        </div>
+        <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+          <div class="font-medium text-surface-900 dark:text-white">延迟恢复</div>
+          <div class="text-surface-500 dark:text-surface-400 mt-1">周期结束后再延迟恢复进入下一周期</div>
+        </div>
+        <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+          <div class="font-medium text-surface-900 dark:text-white">上传压制</div>
+          <div class="text-surface-500 dark:text-surface-400 mt-1">进度 ≥ 80% 且周期均速超标时压制上传</div>
+        </div>
+        <div class="p-4 rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700">
+          <div class="font-medium text-surface-900 dark:text-white">下载刹车</div>
+          <div class="text-surface-500 dark:text-surface-400 mt-1">进度 ≥ 97% 且均速仍超标时锁定下载刹车</div>
+        </div>
       </div>
-      <div v-else class="space-y-4">
-        <div v-for="(item, hash) in status" :key="hash" class="p-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/40">
-          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+    </Card>
+
+    <Card :padding="false">
+      <template #header>
+        <div class="flex items-center justify-between w-full">
+          <div class="flex items-center space-x-3">
+            <div class="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+              <Cog6ToothIcon class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
             <div>
-              <div class="font-semibold text-surface-900 dark:text-white">{{ item.name }}</div>
-              <div class="text-xs text-surface-500 dark:text-surface-400">{{ hash }}</div>
+              <h3 class="font-semibold text-surface-900 dark:text-white">参数配置</h3>
+              <p class="text-xs text-surface-500 dark:text-surface-400">全部都可直接可视化输入</p>
             </div>
-            <div class="text-xs px-2 py-1 rounded-full" :class="statusClass(item.status)">
+          </div>
+          <Button variant="secondary" size="sm" @click="loadStatus">刷新状态</Button>
+        </div>
+      </template>
+      <div class="p-4">
+        <form class="space-y-6" @submit.prevent="saveConfig">
+          <div>
+            <h4 class="text-sm font-medium text-surface-900 dark:text-white mb-3">匹配范围</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="form-group">
+                <label class="form-label">目标标签（逗号分隔）</label>
+                <input v-model="config.target_tags" class="form-input" placeholder="u2, vip" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">目标分类（逗号分隔）</label>
+                <input v-model="config.target_categories" class="form-input" placeholder="u2, movies" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-surface-900 dark:text-white mb-3">周期与安全线</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div class="form-group">
+                <label class="form-label">周期秒数</label>
+                <input v-model.number="config.report_period_seconds" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">恢复延迟秒数</label>
+                <input v-model.number="config.recovery_delay_seconds" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">基础安全均速 (B/s)</label>
+                <input v-model.number="config.upload_limit_bps" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">周期均速阈值 (B/s)</label>
+                <input v-model.number="config.avg_speed_threshold_bps" type="number" class="form-input" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-surface-900 dark:text-white mb-3">刹车与压制</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div class="form-group">
+                <label class="form-label">刹车缓冲 (Bytes)</label>
+                <input v-model.number="config.brake_buffer_bytes" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">上传刹车速度 (B/s)</label>
+                <input v-model.number="config.brake_speed_bps" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">上传压制进度阈值</label>
+                <input v-model.number="config.progress_threshold" type="number" step="0.01" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">上传压制速度 (B/s)</label>
+                <input v-model.number="config.late_stage_limit_bps" type="number" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">下载刹车进度阈值</label>
+                <input v-model.number="config.download_brake_progress_threshold" type="number" step="0.01" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">下载刹车速度 (B/s)</label>
+                <input v-model.number="config.download_brake_speed_bps" type="number" class="form-input" />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <Button variant="secondary" type="button" @click="applyLimits" :loading="applying">立即应用</Button>
+            <Button variant="primary" type="submit" :loading="saving">保存配置</Button>
+          </div>
+        </form>
+      </div>
+    </Card>
+
+    <Card :padding="false">
+      <template #header>
+        <div class="flex items-center justify-between w-full">
+          <div class="flex items-center space-x-3">
+            <div class="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <ChartBarIcon class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 class="font-semibold text-surface-900 dark:text-white">当前管理对象</h3>
+              <p class="text-xs text-surface-500 dark:text-surface-400">状态、阈值、限制值全部可视化</p>
+            </div>
+          </div>
+          <div class="text-xs text-surface-400">{{ lastRefresh || '--:--:--' }}</div>
+        </div>
+      </template>
+
+      <div v-if="Object.keys(status).length === 0" class="py-12 text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-100 dark:bg-surface-700 mb-4">
+          <CloudIcon class="w-8 h-8 text-surface-400" />
+        </div>
+        <p class="text-surface-600 dark:text-surface-400 font-medium">暂无管理中的种子</p>
+        <p class="text-sm text-surface-500 mt-1">当前没有命中标签或分类的对象</p>
+      </div>
+
+      <div v-else class="p-4 space-y-4">
+        <div
+          v-for="(item, hash) in status"
+          :key="hash"
+          class="p-4 bg-surface-50 dark:bg-surface-700/30 rounded-xl border border-surface-200 dark:border-surface-700"
+        >
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-surface-900 dark:text-white truncate text-sm sm:text-base">{{ item.name }}</div>
+              <div class="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">{{ hash }}</div>
+            </div>
+            <span :class="statusClass(item.status)" class="text-xs px-2 py-1 rounded-full flex-shrink-0 font-medium">
               {{ statusLabel(item.status) }}
+            </span>
+          </div>
+
+          <div class="mb-4 p-3 rounded-lg bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border border-indigo-200 dark:border-indigo-800">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div class="flex items-center space-x-2">
+                <ClockIcon class="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                <span class="text-xs text-indigo-700 dark:text-indigo-300 font-medium">本周期剩余</span>
+              </div>
+              <div class="flex items-center justify-end flex-wrap gap-2">
+                <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ formatSeconds(item.period_remaining) }}</span>
+                <span v-if="item.recovery_remaining > 0" class="text-xs text-amber-600 dark:text-amber-400">恢复延迟 {{ formatSeconds(item.recovery_remaining) }}</span>
+              </div>
+            </div>
+            <div class="mt-2 h-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                :style="{ width: `${timeProgress(item)}%` }"
+              />
             </div>
           </div>
 
-          <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 text-sm">
-            <div><div class="text-surface-500 dark:text-surface-400">进度</div><div class="font-medium">{{ Math.round((item.progress || 0) * 100) }}%</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">当前上传</div><div class="font-medium">{{ formatSpeed(item.upload_speed) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">当前下载</div><div class="font-medium">{{ formatSpeed(item.download_speed) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">周期上传</div><div class="font-medium">{{ formatBytes(item.period_uploaded) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">周期均速</div><div class="font-medium">{{ formatSpeed(item.period_avg_speed) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">周期编号</div><div class="font-medium">#{{ item.period_index }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">上传限制</div><div class="font-medium">{{ item.upload_limit > 0 ? formatSpeed(item.upload_limit) : '不限' }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">下载限制</div><div class="font-medium">{{ item.download_limit > 0 ? formatSpeed(item.download_limit) : '不限' }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">周期剩余</div><div class="font-medium">{{ formatSeconds(item.period_remaining) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">恢复剩余</div><div class="font-medium">{{ formatSeconds(item.recovery_remaining) }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">标签命中</div><div class="font-medium">{{ item.matched_by_tag ? '是' : '否' }}</div></div>
-            <div><div class="text-surface-500 dark:text-surface-400">分类命中</div><div class="font-medium">{{ item.matched_by_category ? '是' : '否' }}</div></div>
-          </div>
-
-          <div class="mt-3 text-xs text-surface-500 dark:text-surface-400">
-            标签：{{ (item.tags || []).join(', ') || '无' }} ｜ 分类：{{ item.category || '无' }} ｜ 下载器：{{ item.downloader_name || '-' }}
+          <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2 text-sm">
+            <InfoCell label="进度" :value="`${Math.round((item.progress || 0) * 100)}%`" />
+            <InfoCell label="当前上传" :value="formatSpeed(item.upload_speed)" />
+            <InfoCell label="当前下载" :value="formatSpeed(item.download_speed)" />
+            <InfoCell label="周期上传" :value="formatBytes(item.period_uploaded)" />
+            <InfoCell label="周期均速" :value="formatSpeed(item.period_avg_speed)" />
+            <InfoCell label="周期编号" :value="`#${item.period_index}`" />
+            <InfoCell label="上传限制" :value="item.upload_limit > 0 ? formatSpeed(item.upload_limit) : '不限'" />
+            <InfoCell label="下载限制" :value="item.download_limit > 0 ? formatSpeed(item.download_limit) : '不限'" />
+            <InfoCell label="标签命中" :value="item.matched_by_tag ? '是' : '否'" />
+            <InfoCell label="分类命中" :value="item.matched_by_category ? '是' : '否'" />
+            <InfoCell label="标签" :value="(item.tags || []).join(', ') || '无'" />
+            <InfoCell label="分类" :value="item.category || '无'" />
           </div>
         </div>
       </div>
@@ -185,12 +301,36 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { defineComponent, h, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { speedLimitApi } from '@/api'
 import { getToast } from '@/composables/useToast'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
+import {
+  BoltIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CloudIcon,
+  Cog6ToothIcon,
+  HandRaisedIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+} from '@heroicons/vue/24/outline'
+
+const InfoCell = defineComponent({
+  name: 'InfoCell',
+  props: {
+    label: { type: String, required: true },
+    value: { type: String, required: true },
+  },
+  setup(props) {
+    return () => h('div', { class: 'p-2 rounded-lg bg-surface-100 dark:bg-surface-600/30' }, [
+      h('span', { class: 'text-xs text-surface-500 dark:text-surface-400 block' }, props.label),
+      h('span', { class: 'font-semibold text-surface-900 dark:text-white break-all' }, props.value),
+    ])
+  },
+})
 
 const toast = getToast()
 const config = reactive({})
@@ -246,6 +386,13 @@ function statusClass(v) {
     dual_limit: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
   }
   return map[v] || 'bg-surface-100 text-surface-700 dark:bg-surface-700 dark:text-surface-300'
+}
+
+function timeProgress(item) {
+  const total = Number(config.report_period_seconds || 0)
+  const remaining = Number(item.period_remaining || 0)
+  if (!total) return 0
+  return Math.min(100, Math.max(0, ((total - remaining) / total) * 100))
 }
 
 async function loadConfig() {
